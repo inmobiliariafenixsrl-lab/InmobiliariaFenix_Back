@@ -173,6 +173,29 @@ class CuadrantesService {
     }
   }
 
+  async deleteCuadrante (id) {
+    try {
+    const grupo = await query(
+      'SELECT * FROM cuadrante WHERE idcuadrante = $1',
+      [id]
+    );
+    
+    if (grupo.rows.length === 0) {
+      return false;
+    }
+        
+    await query(
+      'DELETE FROM cuadrante WHERE idcuadrante = $1',
+      [id]
+    );
+    
+    return true;
+  } catch (error) {
+    console.error("Error en deleteCuadrante:", error);
+    throw error;
+  }
+  }
+
   generateColorFromId(id) {
     const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ff6600', '#a00c47', '#999999'];
     if (!id) return colors[Math.floor(Math.random() * colors.length)];

@@ -81,8 +81,41 @@ const updateCuadrante = async (req, res) => {
   }
 };
 
+const deleteCuadrante = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: 'El ID de la zona es requerido'
+      });
+    }
+    const eliminado = await cuadrantesService.deleteCuadrante(id);
+    if (!eliminado) {
+      return res.status(404).json({
+        success: false,
+        message: "Cuadrante no encontrado"
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      message: "Cuadrante eliminado exitosamente"
+    });
+  } catch (error) {
+    console.error('Error en deleteCuadrante:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al eliminar el cuadrante',
+      error: error.message
+    });
+  }
+}
+
 module.exports = {
   getAllCuadrantes,
   createCuadrante,
-  updateCuadrante
+  updateCuadrante,
+  deleteCuadrante
 };

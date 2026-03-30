@@ -15,4 +15,8 @@ router.patch('/:id',
   authorize(['administrador']),   
   cuadrantesController.updateCuadrante);
 
+router.delete('/:id',
+  authorize(['administrador']),   
+  cuadrantesController.deleteCuadrante);
+
 module.exports = router;
