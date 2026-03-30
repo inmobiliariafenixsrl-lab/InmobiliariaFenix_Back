@@ -6,8 +6,8 @@ const app = express();
 
 const allowedOrigins = [
   "http://localhost:8080",
-  "https://ventyxs-sl.netlify.app",
-  "https://ventyx-back.onrender.com",
+  //"https://mutantgym.netlify.app",
+  //"https://mutant-back.onrender.com",
 ];
 
 // Opciones de configuración CORS
@@ -28,14 +28,7 @@ const corsOptions = {
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  // Headers permitidos (actualizado para incluir ambos)
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "X-Tienda-Id",
-    "X-Store-ID",
-    "x-store-id",
-  ],
+  allowedHeaders: ["Content-Type", "Authorization"],
 };
 
 // Aplica CORS
@@ -48,9 +41,12 @@ app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
-const loginRoutes = require("./src/routes/loginRoutes");
+// Rutas
+//const loginRoutes = require("./src/routes/loginroutes");
 
-app.use("/api/login", loginRoutes);
+
+// ✅ CONFIGURACIÓN CORREGIDA: Usar las rutas SIN duplicar middleware
+//app.use("/api/reminders", remindersRoutes);
 
 // Manejador de errores global
 app.use((err, req, res, next) => {
@@ -61,9 +57,6 @@ app.use((err, req, res, next) => {
     error: process.env.NODE_ENV === "development" ? err.message : undefined,
   });
 });
-
-//const historialRoutes = require("./src/routes/historialRoutes");
-//app.use("/api/historial", historialRoutes);
 
 // Ruta 404 para manejar rutas no encontradas
 app.use("*", (req, res) => {
