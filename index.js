@@ -50,6 +50,9 @@ const loginRoutes = require("./src/routes/loginroutes");
 //app.use("/api/reminders", remindersRoutes);
 app.use("/api/login", loginRoutes);
 
+const cuadrantesRoutes = require("./src/routes/cuadrantesRoutes");
+app.use("/api/cuadrantes", cuadrantesRoutes);
+
 // Manejador de errores global
 app.use((err, req, res, next) => {
   console.error(err.stack);
