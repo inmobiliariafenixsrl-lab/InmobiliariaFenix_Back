@@ -43,10 +43,12 @@ app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 // Rutas
 //const loginRoutes = require("./src/routes/loginroutes");
+const loginRoutes = require("./src/routes/loginroutes");
 
 
 // ✅ CONFIGURACIÓN CORREGIDA: Usar las rutas SIN duplicar middleware
 //app.use("/api/reminders", remindersRoutes);
+app.use("/api/login", loginRoutes);
 
 // Manejador de errores global
 app.use((err, req, res, next) => {
