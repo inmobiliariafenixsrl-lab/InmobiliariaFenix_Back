@@ -1,12 +1,17 @@
+// src/services/PropertyManagementService.js
 const { query } = require("../../db");
 
-// Obtener todos los inmuebles
+// Obtener todos los inmuebles con nombre del agente
 const getAllProperties = async () => {
   try {
     const result = await query(
-      `SELECT * FROM Inmueble 
-       WHERE estado NOT IN ('eliminado') 
-       ORDER BY fecha_creacion DESC`
+      `SELECT i.*, 
+              a.nombre as agente_nombre, 
+              a.apellido as agente_apellido
+       FROM Inmueble i
+       LEFT JOIN Agente a ON i.idagente = a.idagente
+       WHERE i.estado NOT IN ('eliminado') 
+       ORDER BY i.fecha_creacion DESC`
     );
     return result.rows;
   } catch (error) {
@@ -15,13 +20,17 @@ const getAllProperties = async () => {
   }
 };
 
-// Obtener inmuebles por agente
+// Obtener inmuebles por agente con nombre del agente
 const getPropertiesByAgent = async (agentId) => {
   try {
     const result = await query(
-      `SELECT * FROM Inmueble 
-       WHERE idagente = $1 AND estado NOT IN ('eliminado') 
-       ORDER BY fecha_creacion DESC`,
+      `SELECT i.*, 
+              a.nombre as agente_nombre, 
+              a.apellido as agente_apellido
+       FROM Inmueble i
+       LEFT JOIN Agente a ON i.idagente = a.idagente
+       WHERE i.idagente = $1 AND i.estado NOT IN ('eliminado') 
+       ORDER BY i.fecha_creacion DESC`,
       [agentId]
     );
     return result.rows;
@@ -31,11 +40,16 @@ const getPropertiesByAgent = async (agentId) => {
   }
 };
 
-// Obtener inmueble por ID
+// Obtener inmueble por ID con nombre del agente
 const getPropertyById = async (id) => {
   try {
     const result = await query(
-      `SELECT * FROM Inmueble WHERE idinmueble = $1`,
+      `SELECT i.*, 
+              a.nombre as agente_nombre, 
+              a.apellido as agente_apellido
+       FROM Inmueble i
+       LEFT JOIN Agente a ON i.idagente = a.idagente
+       WHERE i.idinmueble = $1`,
       [id]
     );
     return result.rows[0];
@@ -99,32 +113,16 @@ const savePropertyProgress = async (propertyData) => {
     estado = 'en proceso'
   } = propertyData;
 
-  // Validar y mapear valores
   const validatedTipoPropiedad = validatePropertyType(tipo_propiedad);
   const validatedCondicion = validateCondition(condicion);
   
-  // Asegurar que el estado sea válido
   let validatedEstado = estado;
   if (estado === 'en_revision') validatedEstado = 'en revisión';
   if (estado === 'en_proceso') validatedEstado = 'en proceso';
   
-  // Validar que el ID del agente existe
   if (!idagente) {
     throw new Error("El ID del agente es obligatorio");
   }
-
-  console.log("Guardando propiedad con datos:", {
-    titulo,
-    operacion,
-    tipo_propiedad: validatedTipoPropiedad,
-    condicion: validatedCondicion,
-    idagente,
-    estado: validatedEstado,
-    precio_capatacion_s,
-    latitud,
-    longitud,
-    tipo_cambio_captacion
-  });
 
   try {
     const result = await query(
@@ -165,8 +163,10 @@ const savePropertyProgress = async (propertyData) => {
         validatedEstado
       ]
     );
-    console.log("Propiedad guardada exitosamente:", result.rows[0].idinmueble);
-    return result.rows[0];
+    
+    // Obtener el inmueble con nombre del agente
+    const propertyWithAgent = await getPropertyById(result.rows[0].idinmueble);
+    return propertyWithAgent;
   } catch (error) {
     console.error("Error en savePropertyProgress SQL:", error);
     throw error;
@@ -202,11 +202,9 @@ const updateProperty = async (id, propertyData) => {
     estado
   } = propertyData;
 
-  // Validar y mapear valores
   const validatedTipoPropiedad = validatePropertyType(tipo_propiedad);
   const validatedCondicion = validateCondition(condicion);
   
-  // Asegurar que el estado sea válido
   let validatedEstado = estado;
   if (estado === 'en_revision') validatedEstado = 'en revisión';
 
@@ -267,6 +265,11 @@ const updateProperty = async (id, propertyData) => {
         id
       ]
     );
+    
+    if (result.rows[0]) {
+      const propertyWithAgent = await getPropertyById(result.rows[0].idinmueble);
+      return propertyWithAgent;
+    }
     return result.rows[0];
   } catch (error) {
     console.error("Error in updateProperty:", error);
@@ -281,6 +284,11 @@ const updatePropertyStatus = async (id, estado) => {
       `UPDATE Inmueble SET estado = $1 WHERE idinmueble = $2 RETURNING *`,
       [estado, id]
     );
+    
+    if (result.rows[0]) {
+      const propertyWithAgent = await getPropertyById(result.rows[0].idinmueble);
+      return propertyWithAgent;
+    }
     return result.rows[0];
   } catch (error) {
     console.error("Error in updatePropertyStatus:", error);
