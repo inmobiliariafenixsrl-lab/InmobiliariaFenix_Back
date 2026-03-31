@@ -1,4 +1,3 @@
-// src/controllers/PropertyManagementController.js
 const propertyManagementService = require("../services/PropertyManagementService");
 
 const getAllProperties = async (req, res) => {
@@ -64,6 +63,20 @@ const savePropertyProgress = async (req, res) => {
       return res.status(400).json({ error: "El ID del agente es obligatorio" });
     }
     
+    // Validar coordenadas
+    if (propertyData.latitud === undefined || propertyData.longitud === undefined) {
+      console.log("Warning: Coordenadas no proporcionadas, usando valores por defecto");
+      propertyData.latitud = propertyData.latitud || -17.3895;
+      propertyData.longitud = propertyData.longitud || -66.1568;
+    }
+    
+    // Validar que el estado sea válido
+    const estadosPermitidos = ['activo', 'en revisión', 'reservado', 'vendido', 'observado', 'eliminado', 'en proceso'];
+    if (propertyData.estado && !estadosPermitidos.includes(propertyData.estado)) {
+      console.log(`Error: Estado inválido: ${propertyData.estado}`);
+      return res.status(400).json({ error: `Estado inválido. Los estados permitidos son: ${estadosPermitidos.join(', ')}` });
+    }
+    
     console.log("Datos validados correctamente, guardando...");
     const newProperty = await propertyManagementService.savePropertyProgress(propertyData);
     console.log("Propiedad guardada con ID:", newProperty.idinmueble);
@@ -79,6 +92,24 @@ const updateProperty = async (req, res) => {
   try {
     const { id } = req.params;
     const propertyData = req.body;
+    
+    // Validar coordenadas
+    if (propertyData.latitud === undefined || propertyData.longitud === undefined) {
+      console.log("Warning: Coordenadas no proporcionadas para actualización");
+      const existingProperty = await propertyManagementService.getPropertyById(id);
+      if (existingProperty) {
+        propertyData.latitud = propertyData.latitud || existingProperty.latitud;
+        propertyData.longitud = propertyData.longitud || existingProperty.longitud;
+      }
+    }
+    
+    // Validar que el estado sea válido
+    const estadosPermitidos = ['activo', 'en revisión', 'reservado', 'vendido', 'observado', 'eliminado', 'en proceso'];
+    if (propertyData.estado && !estadosPermitidos.includes(propertyData.estado)) {
+      console.log(`Error: Estado inválido: ${propertyData.estado}`);
+      return res.status(400).json({ error: `Estado inválido. Los estados permitidos son: ${estadosPermitidos.join(', ')}` });
+    }
+    
     const updatedProperty = await propertyManagementService.updateProperty(id, propertyData);
     if (!updatedProperty) {
       return res.status(404).json({ error: "Inmueble no encontrado" });
@@ -94,6 +125,13 @@ const updatePropertyStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { estado } = req.body;
+    
+    // Validar que el estado sea válido
+    const estadosPermitidos = ['activo', 'en revisión', 'reservado', 'vendido', 'observado', 'eliminado', 'en proceso'];
+    if (!estadosPermitidos.includes(estado)) {
+      return res.status(400).json({ error: `Estado inválido. Los estados permitidos son: ${estadosPermitidos.join(', ')}` });
+    }
+    
     const updatedProperty = await propertyManagementService.updatePropertyStatus(id, estado);
     if (!updatedProperty) {
       return res.status(404).json({ error: "Inmueble no encontrado" });

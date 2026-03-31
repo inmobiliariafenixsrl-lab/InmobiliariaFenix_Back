@@ -1,4 +1,3 @@
-// src/services/PropertyManagementService.js
 const { query } = require("../../db");
 
 // Obtener todos los inmuebles
@@ -46,7 +45,31 @@ const getPropertyById = async (id) => {
   }
 };
 
-// Guardar progreso (crear inmueble en estado "en proceso")
+// Función para validar y mapear tipo de propiedad
+const validatePropertyType = (tipoPropiedad) => {
+  const tiposPermitidos = ['casa', 'departamento', 'atico', 'penhause', 'terreno', 'oficina', 'local comercial'];
+  const normalized = tipoPropiedad ? tipoPropiedad.toLowerCase().trim() : '';
+  
+  if (!tiposPermitidos.includes(normalized)) {
+    console.warn(`Tipo de propiedad "${tipoPropiedad}" no reconocido, usando "casa" como valor por defecto`);
+    return 'casa';
+  }
+  return normalized;
+};
+
+// Función para validar y mapear condición
+const validateCondition = (condicion) => {
+  const condicionesPermitidas = ['nuevo', 'reformado', 'segunda mano'];
+  const normalized = condicion ? condicion.toLowerCase().trim() : '';
+  
+  if (!condicionesPermitidas.includes(normalized)) {
+    console.warn(`Condición "${condicion}" no reconocida, usando "nuevo" como valor por defecto`);
+    return 'nuevo';
+  }
+  return normalized;
+};
+
+// Guardar progreso (crear inmueble)
 const savePropertyProgress = async (propertyData) => {
   const {
     titulo,
@@ -73,17 +96,34 @@ const savePropertyProgress = async (propertyData) => {
     latitud,
     longitud,
     idagente,
-    estado = 'en_proceso'
+    estado = 'en proceso'
   } = propertyData;
+
+  // Validar y mapear valores
+  const validatedTipoPropiedad = validatePropertyType(tipo_propiedad);
+  const validatedCondicion = validateCondition(condicion);
+  
+  // Asegurar que el estado sea válido
+  let validatedEstado = estado;
+  if (estado === 'en_revision') validatedEstado = 'en revisión';
+  if (estado === 'en_proceso') validatedEstado = 'en proceso';
+  
+  // Validar que el ID del agente existe
+  if (!idagente) {
+    throw new Error("El ID del agente es obligatorio");
+  }
 
   console.log("Guardando propiedad con datos:", {
     titulo,
     operacion,
-    tipo_propiedad,
-    condicion,
+    tipo_propiedad: validatedTipoPropiedad,
+    condicion: validatedCondicion,
     idagente,
-    estado,
-    precio_capatacion_s
+    estado: validatedEstado,
+    precio_capatacion_s,
+    latitud,
+    longitud,
+    tipo_cambio_captacion
   });
 
   try {
@@ -101,8 +141,8 @@ const savePropertyProgress = async (propertyData) => {
         titulo || '',
         descripcion || '',
         operacion,
-        tipo_propiedad,
-        condicion,
+        validatedTipoPropiedad,
+        validatedCondicion,
         direccion || '',
         m2_terreno || 0,
         m2_construccion || 0,
@@ -119,10 +159,10 @@ const savePropertyProgress = async (propertyData) => {
         terraza || false,
         piscina || false,
         año_construccion || 0,
-        latitud || -17.78,
-        longitud || -63.18,
+        latitud || -17.3895,
+        longitud || -66.1568,
         idagente,
-        estado
+        validatedEstado
       ]
     );
     console.log("Propiedad guardada exitosamente:", result.rows[0].idinmueble);
@@ -162,6 +202,14 @@ const updateProperty = async (id, propertyData) => {
     estado
   } = propertyData;
 
+  // Validar y mapear valores
+  const validatedTipoPropiedad = validatePropertyType(tipo_propiedad);
+  const validatedCondicion = validateCondition(condicion);
+  
+  // Asegurar que el estado sea válido
+  let validatedEstado = estado;
+  if (estado === 'en_revision') validatedEstado = 'en revisión';
+
   try {
     const result = await query(
       `UPDATE Inmueble SET
@@ -195,8 +243,8 @@ const updateProperty = async (id, propertyData) => {
         titulo || '',
         descripcion || '',
         operacion,
-        tipo_propiedad,
-        condicion,
+        validatedTipoPropiedad,
+        validatedCondicion,
         direccion || '',
         m2_terreno || 0,
         m2_construccion || 0,
@@ -213,9 +261,9 @@ const updateProperty = async (id, propertyData) => {
         terraza || false,
         piscina || false,
         año_construccion || 0,
-        latitud || -17.78,
-        longitud || -63.18,
-        estado,
+        latitud || -17.3895,
+        longitud || -66.1568,
+        validatedEstado,
         id
       ]
     );
