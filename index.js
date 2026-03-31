@@ -41,17 +41,15 @@ app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
-// Rutas
-//const loginRoutes = require("./src/routes/loginroutes");
 const loginRoutes = require("./src/routes/loginroutes");
-
-
-// ✅ CONFIGURACIÓN CORREGIDA: Usar las rutas SIN duplicar middleware
-//app.use("/api/reminders", remindersRoutes);
 app.use("/api/login", loginRoutes);
 
 const cuadrantesRoutes = require("./src/routes/cuadrantesRoutes");
 app.use("/api/cuadrantes", cuadrantesRoutes);
+
+
+const documentManagementRoutes = require("./src/routes/DocumentManagementRoutes");
+app.use("/api/documentos", documentManagementRoutes);
 
 // Manejador de errores global
 app.use((err, req, res, next) => {
