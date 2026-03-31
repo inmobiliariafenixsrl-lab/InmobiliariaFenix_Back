@@ -6,8 +6,8 @@ const app = express();
 
 const allowedOrigins = [
   "http://localhost:8080",
-  //"https://mutantgym.netlify.app",
-  //"https://mutant-back.onrender.com",
+  "https://inmobiliriafenix.netlify.app",
+  "https://inmobiliariafenix-back.onrender.com",
 ];
 
 // Opciones de configuración CORS
@@ -46,7 +46,6 @@ app.use("/api/login", loginRoutes);
 
 const cuadrantesRoutes = require("./src/routes/cuadrantesRoutes");
 app.use("/api/cuadrantes", cuadrantesRoutes);
-
 
 const documentManagementRoutes = require("./src/routes/DocumentManagementRoutes");
 app.use("/api/documentos", documentManagementRoutes);
