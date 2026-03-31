@@ -50,6 +50,9 @@ app.use("/api/cuadrantes", cuadrantesRoutes);
 const documentManagementRoutes = require("./src/routes/DocumentManagementRoutes");
 app.use("/api/documentos", documentManagementRoutes);
 
+const propertyManagementRoutes = require("./src/routes/PropertyManagementRoutes");
+app.use("/api", propertyManagementRoutes);
+
 // Manejador de errores global
 app.use((err, req, res, next) => {
   console.error(err.stack);
