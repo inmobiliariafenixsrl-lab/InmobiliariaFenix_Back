@@ -1,4 +1,3 @@
-// src/services/PropertyManagementService.js
 const { query } = require("../../db");
 
 const getAllProperties = async () => {
@@ -58,11 +57,30 @@ const getPropertyById = async (id) => {
 
 const validatePropertyType = (tipoPropiedad) => {
   const tiposPermitidos = ['casa', 'departamento', 'atico', 'penhause', 'terreno', 'oficina', 'local comercial'];
-  const normalized = tipoPropiedad ? tipoPropiedad.toLowerCase().trim() : '';
+  let normalized = tipoPropiedad ? tipoPropiedad.toLowerCase().trim() : '';
+  
+  // Manejar 'local comercial' correctamente
+  if (normalized === 'local comercial' || normalized === 'localcomercial') {
+    return 'local comercial';
+  }
   
   if (!tiposPermitidos.includes(normalized)) {
     console.warn(`Tipo de propiedad "${tipoPropiedad}" no reconocido, usando "casa" como valor por defecto`);
     return 'casa';
+  }
+  return normalized;
+};
+
+const validateOperation = (operacion) => {
+  const opsPermitidas = ['venta', 'alquiler', 'anticrético'];
+  let normalized = operacion ? operacion.toLowerCase().trim() : '';
+  if (normalized === 'anticretico') {
+    normalized = 'anticrético';
+  }
+  
+  if (!opsPermitidas.includes(normalized)) {
+    console.warn(`Operación "${operacion}" no reconocida, usando "venta" como valor por defecto`);
+    return 'venta';
   }
   return normalized;
 };
@@ -76,6 +94,24 @@ const validateCondition = (condicion) => {
     return 'nuevo';
   }
   return normalized;
+};
+
+const validateStatus = (estado) => {
+  const estadosPermitidos = ['activo', 'en revisión', 'reservado', 'vendido', 'observado', 'eliminado', 'en proceso'];
+  const normalized = estado ? estado.toLowerCase().trim() : 'en proceso';
+  
+  let finalEstado = normalized;
+  if (normalized === 'en_revision') {
+    finalEstado = 'en revisión';
+  } else if (normalized === 'en_proceso') {
+    finalEstado = 'en proceso';
+  }
+  
+  if (!estadosPermitidos.includes(finalEstado)) {
+    console.warn(`Estado "${estado}" no reconocido, usando "en proceso" como valor por defecto`);
+    return 'en proceso';
+  }
+  return finalEstado;
 };
 
 const savePropertyProgress = async (propertyData) => {
@@ -109,12 +145,17 @@ const savePropertyProgress = async (propertyData) => {
 
   const validatedTipoPropiedad = validatePropertyType(tipo_propiedad);
   const validatedCondicion = validateCondition(condicion);
-  
-  let validatedEstado = estado || 'en proceso';
-  if (validatedEstado === 'en_revision') validatedEstado = 'en revisión';
+  const validatedOperacion = validateOperation(operacion);
+  const validatedEstado = validateStatus(estado);
   
   if (!idagente) {
     throw new Error("El ID del agente es obligatorio");
+  }
+
+  // Validar año de construcción
+  let validYear = año_construccion;
+  if (!validYear || validYear < 1900 || validYear > new Date().getFullYear() + 5) {
+    validYear = new Date().getFullYear();
   }
 
   const validLatitud = latitud && !isNaN(parseFloat(latitud)) ? parseFloat(latitud) : -17.3895;
@@ -134,7 +175,7 @@ const savePropertyProgress = async (propertyData) => {
       [
         titulo || '',
         descripcion || '',
-        operacion,
+        validatedOperacion,
         validatedTipoPropiedad,
         validatedCondicion,
         direccion || '',
@@ -152,7 +193,7 @@ const savePropertyProgress = async (propertyData) => {
         garaje || false,
         terraza || false,
         piscina || false,
-        año_construccion || 0,
+        validYear,
         validLatitud,
         validLongitud,
         idagente,
@@ -198,10 +239,13 @@ const updateProperty = async (id, propertyData) => {
 
   const validatedTipoPropiedad = validatePropertyType(tipo_propiedad);
   const validatedCondicion = validateCondition(condicion);
+  const validatedOperacion = validateOperation(operacion);
+  const validatedEstado = validateStatus(estado);
   
-  let validatedEstado = estado;
-  if (validatedEstado === 'en_revision') validatedEstado = 'en revisión';
-  if (validatedEstado === 'en_proceso') validatedEstado = 'en proceso';
+  let validYear = año_construccion;
+  if (!validYear || validYear < 1900 || validYear > new Date().getFullYear() + 5) {
+    validYear = new Date().getFullYear();
+  }
 
   const validLatitud = latitud && !isNaN(parseFloat(latitud)) ? parseFloat(latitud) : -17.3895;
   const validLongitud = longitud && !isNaN(parseFloat(longitud)) ? parseFloat(longitud) : -66.1568;
@@ -238,7 +282,7 @@ const updateProperty = async (id, propertyData) => {
       [
         titulo || '',
         descripcion || '',
-        operacion,
+        validatedOperacion,
         validatedTipoPropiedad,
         validatedCondicion,
         direccion || '',
@@ -256,7 +300,7 @@ const updateProperty = async (id, propertyData) => {
         garaje || false,
         terraza || false,
         piscina || false,
-        año_construccion || 0,
+        validYear,
         validLatitud,
         validLongitud,
         validatedEstado,
@@ -277,9 +321,10 @@ const updateProperty = async (id, propertyData) => {
 
 const updatePropertyStatus = async (id, estado) => {
   try {
+    const validatedEstado = validateStatus(estado);
     const result = await query(
       `UPDATE Inmueble SET estado = $1 WHERE idinmueble = $2 RETURNING *`,
-      [estado, id]
+      [validatedEstado, id]
     );
     
     if (result.rows[0]) {

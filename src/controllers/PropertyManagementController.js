@@ -1,4 +1,3 @@
-// src/controllers/PropertyManagementController.js
 const propertyManagementService = require("../services/PropertyManagementService");
 
 const getAllProperties = async (req, res) => {
@@ -67,6 +66,12 @@ const savePropertyProgress = async (req, res) => {
     // Asegurar que el estado sea "en proceso"
     propertyData.estado = 'en proceso';
     
+    // Validar año de construcción
+    if (!propertyData.año_construccion || propertyData.año_construccion < 1900 || propertyData.año_construccion > new Date().getFullYear() + 5) {
+      console.log("Warning: Año de construcción inválido, usando año actual");
+      propertyData.año_construccion = new Date().getFullYear();
+    }
+    
     // Validar coordenadas
     if (propertyData.latitud === undefined || propertyData.longitud === undefined || 
         isNaN(propertyData.latitud) || isNaN(propertyData.longitud)) {
@@ -90,6 +95,12 @@ const updateProperty = async (req, res) => {
   try {
     const { id } = req.params;
     const propertyData = req.body;
+    
+    // Validar año de construcción
+    if (!propertyData.año_construccion || propertyData.año_construccion < 1900 || propertyData.año_construccion > new Date().getFullYear() + 5) {
+      console.log("Warning: Año de construcción inválido, usando año actual");
+      propertyData.año_construccion = new Date().getFullYear();
+    }
     
     // Validar coordenadas
     if (propertyData.latitud === undefined || propertyData.longitud === undefined ||
