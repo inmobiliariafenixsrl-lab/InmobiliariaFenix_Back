@@ -1,7 +1,6 @@
 // src/services/PropertyManagementService.js
 const { query } = require("../../db");
 
-// Obtener todos los inmuebles con nombre del agente
 const getAllProperties = async () => {
   try {
     const result = await query(
@@ -20,7 +19,6 @@ const getAllProperties = async () => {
   }
 };
 
-// Obtener inmuebles por agente con nombre del agente
 const getPropertiesByAgent = async (agentId) => {
   try {
     const result = await query(
@@ -40,7 +38,6 @@ const getPropertiesByAgent = async (agentId) => {
   }
 };
 
-// Obtener inmueble por ID con nombre del agente
 const getPropertyById = async (id) => {
   try {
     const result = await query(
@@ -59,7 +56,6 @@ const getPropertyById = async (id) => {
   }
 };
 
-// Función para validar y mapear tipo de propiedad
 const validatePropertyType = (tipoPropiedad) => {
   const tiposPermitidos = ['casa', 'departamento', 'atico', 'penhause', 'terreno', 'oficina', 'local comercial'];
   const normalized = tipoPropiedad ? tipoPropiedad.toLowerCase().trim() : '';
@@ -71,7 +67,6 @@ const validatePropertyType = (tipoPropiedad) => {
   return normalized;
 };
 
-// Función para validar y mapear condición
 const validateCondition = (condicion) => {
   const condicionesPermitidas = ['nuevo', 'reformado', 'segunda mano'];
   const normalized = condicion ? condicion.toLowerCase().trim() : '';
@@ -83,7 +78,6 @@ const validateCondition = (condicion) => {
   return normalized;
 };
 
-// Guardar progreso (crear inmueble)
 const savePropertyProgress = async (propertyData) => {
   const {
     titulo,
@@ -110,19 +104,21 @@ const savePropertyProgress = async (propertyData) => {
     latitud,
     longitud,
     idagente,
-    estado = 'en proceso'
+    estado
   } = propertyData;
 
   const validatedTipoPropiedad = validatePropertyType(tipo_propiedad);
   const validatedCondicion = validateCondition(condicion);
   
-  let validatedEstado = estado;
-  if (estado === 'en_revision') validatedEstado = 'en revisión';
-  if (estado === 'en_proceso') validatedEstado = 'en proceso';
+  let validatedEstado = estado || 'en proceso';
+  if (validatedEstado === 'en_revision') validatedEstado = 'en revisión';
   
   if (!idagente) {
     throw new Error("El ID del agente es obligatorio");
   }
+
+  const validLatitud = latitud && !isNaN(parseFloat(latitud)) ? parseFloat(latitud) : -17.3895;
+  const validLongitud = longitud && !isNaN(parseFloat(longitud)) ? parseFloat(longitud) : -66.1568;
 
   try {
     const result = await query(
@@ -157,14 +153,13 @@ const savePropertyProgress = async (propertyData) => {
         terraza || false,
         piscina || false,
         año_construccion || 0,
-        latitud || -17.3895,
-        longitud || -66.1568,
+        validLatitud,
+        validLongitud,
         idagente,
         validatedEstado
       ]
     );
     
-    // Obtener el inmueble con nombre del agente
     const propertyWithAgent = await getPropertyById(result.rows[0].idinmueble);
     return propertyWithAgent;
   } catch (error) {
@@ -173,7 +168,6 @@ const savePropertyProgress = async (propertyData) => {
   }
 };
 
-// Actualizar inmueble
 const updateProperty = async (id, propertyData) => {
   const {
     titulo,
@@ -206,7 +200,11 @@ const updateProperty = async (id, propertyData) => {
   const validatedCondicion = validateCondition(condicion);
   
   let validatedEstado = estado;
-  if (estado === 'en_revision') validatedEstado = 'en revisión';
+  if (validatedEstado === 'en_revision') validatedEstado = 'en revisión';
+  if (validatedEstado === 'en_proceso') validatedEstado = 'en proceso';
+
+  const validLatitud = latitud && !isNaN(parseFloat(latitud)) ? parseFloat(latitud) : -17.3895;
+  const validLongitud = longitud && !isNaN(parseFloat(longitud)) ? parseFloat(longitud) : -66.1568;
 
   try {
     const result = await query(
@@ -259,8 +257,8 @@ const updateProperty = async (id, propertyData) => {
         terraza || false,
         piscina || false,
         año_construccion || 0,
-        latitud || -17.3895,
-        longitud || -66.1568,
+        validLatitud,
+        validLongitud,
         validatedEstado,
         id
       ]
@@ -277,7 +275,6 @@ const updateProperty = async (id, propertyData) => {
   }
 };
 
-// Actualizar estado del inmueble
 const updatePropertyStatus = async (id, estado) => {
   try {
     const result = await query(
@@ -296,7 +293,6 @@ const updatePropertyStatus = async (id, estado) => {
   }
 };
 
-// Eliminar inmueble (soft delete)
 const deleteProperty = async (id) => {
   try {
     const result = await query(
