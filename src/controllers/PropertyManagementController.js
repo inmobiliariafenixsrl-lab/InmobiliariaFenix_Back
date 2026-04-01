@@ -13,11 +13,14 @@ const getAllProperties = async (req, res) => {
 const getPropertiesByAgent = async (req, res) => {
   try {
     const { agentId } = req.params;
-    const properties = await propertyManagementService.getPropertiesByAgent(agentId);
+    const properties =
+      await propertyManagementService.getPropertiesByAgent(agentId);
     res.status(200).json(properties);
   } catch (error) {
     console.error("Error in getPropertiesByAgent:", error);
-    res.status(500).json({ error: "Error al obtener los inmuebles del agente" });
+    res
+      .status(500)
+      .json({ error: "Error al obtener los inmuebles del agente" });
   }
 };
 
@@ -39,55 +42,87 @@ const savePropertyProgress = async (req, res) => {
   try {
     console.log("=== savePropertyProgress recibido ===");
     console.log("Body recibido:", JSON.stringify(req.body, null, 2));
-    
+
+    // Extraer datos del body
     const propertyData = req.body;
-    
+    const documents = propertyData.documents; // Extraer documentos si existen
+    const videoUrl = propertyData.videoUrl;
+    const images = propertyData.images;
+
+    // Remover campos que no pertenecen a la tabla inmueble
+    delete propertyData.documents;
+    delete propertyData.videoUrl;
+    delete propertyData.images;
+
     // Validaciones básicas
     if (!propertyData.titulo) {
       console.log("Error: Título faltante");
       return res.status(400).json({ error: "El título es obligatorio" });
     }
-    
+
     if (!propertyData.operacion) {
       console.log("Error: Operación faltante");
       return res.status(400).json({ error: "La operación es obligatoria" });
     }
-    
+
     if (!propertyData.tipo_propiedad) {
       console.log("Error: Tipo de propiedad faltante");
-      return res.status(400).json({ error: "El tipo de propiedad es obligatorio" });
+      return res
+        .status(400)
+        .json({ error: "El tipo de propiedad es obligatorio" });
     }
-    
+
     if (!propertyData.idagente) {
       console.log("Error: ID de agente faltante");
       return res.status(400).json({ error: "El ID del agente es obligatorio" });
     }
-    
+
     // Asegurar que el estado sea "en proceso"
-    propertyData.estado = 'en proceso';
-    
+    propertyData.estado = "en proceso";
+
     // Validar año de construcción
-    if (!propertyData.año_construccion || propertyData.año_construccion < 1900 || propertyData.año_construccion > new Date().getFullYear() + 5) {
+    if (
+      !propertyData.año_construccion ||
+      propertyData.año_construccion < 1900 ||
+      propertyData.año_construccion > new Date().getFullYear() + 5
+    ) {
       console.log("Warning: Año de construcción inválido, usando año actual");
       propertyData.año_construccion = new Date().getFullYear();
     }
-    
+
     // Validar coordenadas
-    if (propertyData.latitud === undefined || propertyData.longitud === undefined || 
-        isNaN(propertyData.latitud) || isNaN(propertyData.longitud)) {
-      console.log("Warning: Coordenadas no válidas, usando valores por defecto");
+    if (
+      propertyData.latitud === undefined ||
+      propertyData.longitud === undefined ||
+      isNaN(propertyData.latitud) ||
+      isNaN(propertyData.longitud)
+    ) {
+      console.log(
+        "Warning: Coordenadas no válidas, usando valores por defecto",
+      );
       propertyData.latitud = -17.3895;
       propertyData.longitud = -66.1568;
     }
-    
+
     console.log("Datos validados correctamente, guardando...");
-    const newProperty = await propertyManagementService.savePropertyProgress(propertyData);
+    // Pasar también los documentos al servicio
+    const newProperty = await propertyManagementService.savePropertyProgress(
+      propertyData,
+      documents,
+    );
     console.log("Propiedad guardada con ID:", newProperty.idinmueble);
-    
+
+    // Aquí podrías guardar también imágenes y video en una tabla separada si es necesario
+
     res.status(201).json(newProperty);
   } catch (error) {
     console.error("Error in savePropertyProgress:", error);
-    res.status(500).json({ error: "Error al guardar el progreso del inmueble", details: error.message });
+    res
+      .status(500)
+      .json({
+        error: "Error al guardar el progreso del inmueble",
+        details: error.message,
+      });
   }
 };
 
@@ -95,18 +130,35 @@ const updateProperty = async (req, res) => {
   try {
     const { id } = req.params;
     const propertyData = req.body;
-    
+    const documents = propertyData.documents;
+    const videoUrl = propertyData.videoUrl;
+    const images = propertyData.images;
+
+    // Remover campos que no pertenecen a la tabla inmueble
+    delete propertyData.documents;
+    delete propertyData.videoUrl;
+    delete propertyData.images;
+
     // Validar año de construcción
-    if (!propertyData.año_construccion || propertyData.año_construccion < 1900 || propertyData.año_construccion > new Date().getFullYear() + 5) {
+    if (
+      !propertyData.año_construccion ||
+      propertyData.año_construccion < 1900 ||
+      propertyData.año_construccion > new Date().getFullYear() + 5
+    ) {
       console.log("Warning: Año de construcción inválido, usando año actual");
       propertyData.año_construccion = new Date().getFullYear();
     }
-    
+
     // Validar coordenadas
-    if (propertyData.latitud === undefined || propertyData.longitud === undefined ||
-        isNaN(propertyData.latitud) || isNaN(propertyData.longitud)) {
+    if (
+      propertyData.latitud === undefined ||
+      propertyData.longitud === undefined ||
+      isNaN(propertyData.latitud) ||
+      isNaN(propertyData.longitud)
+    ) {
       console.log("Warning: Coordenadas no proporcionadas para actualización");
-      const existingProperty = await propertyManagementService.getPropertyById(id);
+      const existingProperty =
+        await propertyManagementService.getPropertyById(id);
       if (existingProperty) {
         propertyData.latitud = existingProperty.latitud || -17.3895;
         propertyData.longitud = existingProperty.longitud || -66.1568;
@@ -115,8 +167,12 @@ const updateProperty = async (req, res) => {
         propertyData.longitud = -66.1568;
       }
     }
-    
-    const updatedProperty = await propertyManagementService.updateProperty(id, propertyData);
+
+    const updatedProperty = await propertyManagementService.updateProperty(
+      id,
+      propertyData,
+      documents,
+    );
     if (!updatedProperty) {
       return res.status(404).json({ error: "Inmueble no encontrado" });
     }
@@ -131,14 +187,27 @@ const updatePropertyStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { estado } = req.body;
-    
+
     // Validar que el estado sea válido
-    const estadosPermitidos = ['activo', 'en revisión', 'reservado', 'vendido', 'observado', 'eliminado', 'en proceso'];
+    const estadosPermitidos = [
+      "activo",
+      "en revisión",
+      "reservado",
+      "vendido",
+      "observado",
+      "eliminado",
+      "en proceso",
+    ];
     if (!estadosPermitidos.includes(estado)) {
-      return res.status(400).json({ error: `Estado inválido. Los estados permitidos son: ${estadosPermitidos.join(', ')}` });
+      return res
+        .status(400)
+        .json({
+          error: `Estado inválido. Los estados permitidos son: ${estadosPermitidos.join(", ")}`,
+        });
     }
-    
-    const updatedProperty = await propertyManagementService.updatePropertyStatus(id, estado);
+
+    const updatedProperty =
+      await propertyManagementService.updatePropertyStatus(id, estado);
     if (!updatedProperty) {
       return res.status(404).json({ error: "Inmueble no encontrado" });
     }
