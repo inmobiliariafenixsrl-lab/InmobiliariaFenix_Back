@@ -1,4 +1,4 @@
-const { query } = require("../../db");
+const { query, getClient } = require("../../db");
 
 class DocumentManagementService {
   async getPropertiesInReview() {
@@ -38,11 +38,62 @@ class DocumentManagementService {
     const result = await query(sql, [propertyId]);
     
     // Agregar estado basado en la existencia de revisión
-    // Como no hay estado en documento, todos se consideran pendientes
     return result.rows.map(doc => ({
       ...doc,
       estado: "pendiente"
     }));
+  }
+
+  async getDocumentFile(documentId) {
+    const infoSql = `
+      SELECT 
+        d.iddocumento,
+        d.nombre_archivo,
+        d.pdf as archivo,
+        dt.nombre as tipo_documento
+      FROM documento d
+      INNER JOIN documento_tipo dt ON d.idtipo_documento = dt.idtipo_documento
+      WHERE d.iddocumento = $1
+    `;
+    
+    const infoResult = await query(infoSql, [documentId]);
+    
+    if (infoResult.rows.length === 0) {
+      throw new Error("Documento no encontrado");
+    }
+    
+    const doc = infoResult.rows[0];
+    
+    if (doc.archivo) {
+      return {
+        fileBuffer: doc.archivo,
+        fileName: doc.nombre_archivo,
+        mimeType: 'application/pdf'
+      };
+    }
+    
+    const fs = require('fs');
+    const path = require('path');
+    
+    const possiblePaths = [
+      path.join(__dirname, '../../uploads/documentos', doc.nombre_archivo),
+      path.join(__dirname, '../uploads/documentos', doc.nombre_archivo),
+      path.join(process.cwd(), 'uploads/documentos', doc.nombre_archivo),
+      path.join(process.cwd(), 'public/uploads/documentos', doc.nombre_archivo)
+    ];
+    
+    for (const filePath of possiblePaths) {
+      if (fs.existsSync(filePath)) {
+        const fileBuffer = fs.readFileSync(filePath);
+        return {
+          fileBuffer: fileBuffer,
+          fileName: doc.nombre_archivo,
+          mimeType: 'application/pdf'
+        };
+      }
+    }
+    
+    throw new Error("Archivo no encontrado en el sistema");
   }
 
   async getReviewHistory(reviewerId, userRole) {
@@ -63,7 +114,6 @@ class DocumentManagementService {
     
     const params = [];
     
-    // Si no es administrador, solo ve las revisiones que hizo
     if (userRole !== 'administrador') {
       sql += ` WHERE r.idagente = $1`;
       params.push(reviewerId);
@@ -73,7 +123,6 @@ class DocumentManagementService {
     
     const result = await query(sql, params);
     
-    // Contar documentos para cada propiedad
     const historyWithCounts = await Promise.all(result.rows.map(async (row) => {
       const docsCount = await query(
         `SELECT COUNT(*) as total FROM documento WHERE idinmueble = $1`,
@@ -92,100 +141,52 @@ class DocumentManagementService {
     return historyWithCounts;
   }
 
-  async submitReview(propertyId, status, observation, reviewerId, documents = null) {
-    const client = await this.getClient();
-    
-    try {
-      await client.query('BEGIN');
-      
-      // Actualizar estado del inmueble
-      const propertyStatus = status === 'aprobado' ? 'activo' : 'observado';
-      await client.query(
-        `UPDATE inmueble SET estado = $1, observacion = $2 WHERE idinmueble = $3`,
-        [propertyStatus, observation || null, propertyId]
-      );
-      
-      // Registrar en historial de revisiones
-      await client.query(
-        `INSERT INTO inmueble_revision 
-         (idagente, idinmueble, fecha_revision)
-         VALUES ($1, $2, NOW())`,
-        [reviewerId, propertyId]
-      );
-      
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
-
   async approveAllDocuments(propertyId, reviewerId, observation = null) {
-    const client = await this.getClient();
-    
+    // Usar la función query directamente en lugar de crear un nuevo cliente
     try {
-      await client.query('BEGIN');
-      
       // Actualizar estado del inmueble a activo
-      await client.query(
+      await query(
         `UPDATE inmueble SET estado = 'activo', observacion = NULL WHERE idinmueble = $1`,
         [propertyId]
       );
       
       // Registrar en historial
-      await client.query(
+      await query(
         `INSERT INTO inmueble_revision 
          (idagente, idinmueble, fecha_revision)
          VALUES ($1, $2, NOW())`,
         [reviewerId, propertyId]
       );
       
-      await client.query('COMMIT');
+      return { success: true };
     } catch (error) {
-      await client.query('ROLLBACK');
+      console.error("Error in approveAllDocuments:", error);
       throw error;
-    } finally {
-      client.release();
     }
   }
 
   async rejectAllDocuments(propertyId, reviewerId, observation) {
-    const client = await this.getClient();
-    
+    // Usar la función query directamente en lugar de crear un nuevo cliente
     try {
-      await client.query('BEGIN');
-      
       // Actualizar estado del inmueble a observado
-      await client.query(
+      await query(
         `UPDATE inmueble SET estado = 'observado', observacion = $1 WHERE idinmueble = $2`,
         [observation, propertyId]
       );
       
       // Registrar en historial
-      await client.query(
+      await query(
         `INSERT INTO inmueble_revision 
          (idagente, idinmueble, fecha_revision)
          VALUES ($1, $2, NOW())`,
         [reviewerId, propertyId]
       );
       
-      await client.query('COMMIT');
+      return { success: true };
     } catch (error) {
-      await client.query('ROLLBACK');
+      console.error("Error in rejectAllDocuments:", error);
       throw error;
-    } finally {
-      client.release();
     }
-  }
-
-  async getClient() {
-    const { Pool } = require('pg');
-    const pool = new Pool({
-      connectionString: process.env.DATABASE_URL
-    });
-    return await pool.connect();
   }
 }
 

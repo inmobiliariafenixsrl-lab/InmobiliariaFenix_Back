@@ -22,6 +22,20 @@ class DocumentManagementController {
     }
   }
 
+  async getDocumentFile(req, res) {
+    try {
+      const { documentId } = req.params;
+      const { fileBuffer, fileName, mimeType } = await documentManagementService.getDocumentFile(documentId);
+      
+      res.setHeader('Content-Type', mimeType || 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${fileName || `documento_${documentId}.pdf`}"`);
+      res.send(fileBuffer);
+    } catch (error) {
+      console.error("Error in getDocumentFile:", error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
   async getReviewHistory(req, res) {
     try {
       const history = await documentManagementService.getReviewHistory(

@@ -20,6 +20,12 @@ router.get(
   documentManagementController.getPropertyDocuments
 );
 
+// Obtener archivo de un documento
+router.get(
+  "/archivo/:documentId",
+  documentManagementController.getDocumentFile
+);
+
 // Obtener historial de revisiones
 router.get(
   "/historial",
