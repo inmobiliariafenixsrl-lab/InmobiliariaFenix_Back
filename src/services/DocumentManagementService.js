@@ -1,4 +1,4 @@
-const { query, getClient } = require("../../db");
+const { query } = require("../../db");
 
 class DocumentManagementService {
   async getPropertiesInReview() {
@@ -15,7 +15,6 @@ class DocumentManagementService {
     
     const result = await query(sql);
     
-    // Agregar imagen por defecto
     return result.rows.map(property => ({
       ...property,
       imagenes: ["/images/casa.jpg"]
@@ -37,7 +36,6 @@ class DocumentManagementService {
     
     const result = await query(sql, [propertyId]);
     
-    // Agregar estado basado en la existencia de revisión
     return result.rows.map(doc => ({
       ...doc,
       estado: "pendiente"
@@ -64,7 +62,7 @@ class DocumentManagementService {
     
     const doc = infoResult.rows[0];
     
-    if (doc.archivo) {
+    if (doc.archivo && doc.archivo.length > 0) {
       return {
         fileBuffer: doc.archivo,
         fileName: doc.nombre_archivo,
@@ -142,23 +140,28 @@ class DocumentManagementService {
   }
 
   async approveAllDocuments(propertyId, reviewerId, observation = null) {
-    // Usar la función query directamente en lugar de crear un nuevo cliente
     try {
+      // Verificar si ya existe en inmueble_revision (NO insertar duplicados)
+      const checkSql = `SELECT idinmueble_revision FROM inmueble_revision WHERE idinmueble = $1`;
+      const checkResult = await query(checkSql, [propertyId]);
+      
+      // Solo insertar si NO existe
+      if (checkResult.rows.length === 0) {
+        await query(
+          `INSERT INTO inmueble_revision (idagente, idinmueble, fecha_revision)
+           VALUES ($1, $2, NOW())`,
+          [reviewerId, propertyId]
+        );
+      }
+      
       // Actualizar estado del inmueble a activo
       await query(
         `UPDATE inmueble SET estado = 'activo', observacion = NULL WHERE idinmueble = $1`,
         [propertyId]
       );
       
-      // Registrar en historial
-      await query(
-        `INSERT INTO inmueble_revision 
-         (idagente, idinmueble, fecha_revision)
-         VALUES ($1, $2, NOW())`,
-        [reviewerId, propertyId]
-      );
-      
       return { success: true };
+      
     } catch (error) {
       console.error("Error in approveAllDocuments:", error);
       throw error;
@@ -166,23 +169,28 @@ class DocumentManagementService {
   }
 
   async rejectAllDocuments(propertyId, reviewerId, observation) {
-    // Usar la función query directamente en lugar de crear un nuevo cliente
     try {
+      // Verificar si ya existe en inmueble_revision (NO insertar duplicados)
+      const checkSql = `SELECT idinmueble_revision FROM inmueble_revision WHERE idinmueble = $1`;
+      const checkResult = await query(checkSql, [propertyId]);
+      
+      // Solo insertar si NO existe
+      if (checkResult.rows.length === 0) {
+        await query(
+          `INSERT INTO inmueble_revision (idagente, idinmueble, fecha_revision)
+           VALUES ($1, $2, NOW())`,
+          [reviewerId, propertyId]
+        );
+      }
+      
       // Actualizar estado del inmueble a observado
       await query(
         `UPDATE inmueble SET estado = 'observado', observacion = $1 WHERE idinmueble = $2`,
         [observation, propertyId]
       );
       
-      // Registrar en historial
-      await query(
-        `INSERT INTO inmueble_revision 
-         (idagente, idinmueble, fecha_revision)
-         VALUES ($1, $2, NOW())`,
-        [reviewerId, propertyId]
-      );
-      
       return { success: true };
+      
     } catch (error) {
       console.error("Error in rejectAllDocuments:", error);
       throw error;
