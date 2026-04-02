@@ -185,6 +185,7 @@ const getPropertiesByAgent = async (agentId) => {
 
 const getPropertyDocuments = async (propertyId) => {
   try {
+    // CORREGIDO: Usar idinmueble
     const result = await query(
       `SELECT d.*, dt.nombre as tipo_nombre 
        FROM Documento d
@@ -484,7 +485,52 @@ const deleteProperty = async (id) => {
   }
 };
 
+const uploadDocument = async (propertyId, documentTypeId, pdfBuffer, fileName) => {
+  try {
+    // CORREGIDO: Usar idinmueble (sin mayúsculas) y iddocumento
+    const result = await query(
+      `INSERT INTO Documento (idinmueble, pdf, idtipo_documento, nombre_archivo) 
+       VALUES ($1, $2, $3, $4) RETURNING iddocumento`,
+      [propertyId, pdfBuffer, documentTypeId, fileName]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error("Error in uploadDocument:", error);
+    throw error;
+  }
+};
 
+const getDocumentFile = async (documentId) => {
+  try {
+    // CORREGIDO: Usar "iddocumento" (con 'n')
+    const result = await query(
+      `SELECT iddocumento, pdf, nombre_archivo, idtipo_documento 
+       FROM Documento 
+       WHERE iddocumento = $1`,
+      [documentId]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error("Error in getDocumentFile:", error);
+    throw error;
+  }
+};
+
+const deleteDocument = async (documentId) => {
+  try {
+    // CORREGIDO: Usar iddocumento
+    const result = await query(
+      `DELETE FROM Documento WHERE iddocumento = $1 RETURNING *`,
+      [documentId]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error("Error in deleteDocument:", error);
+    throw error;
+  }
+};
+
+// Agregar al module.exports
 module.exports = {
   getAllProperties,
   getPropertiesByAgent,
@@ -495,4 +541,7 @@ module.exports = {
   deleteProperty,
   getPropertyDocuments,
   saveDocuments,
+  uploadDocument,
+  getDocumentFile,
+  deleteDocument,
 };
