@@ -61,7 +61,7 @@ const createAgente = async (req, res) => {
     if (nuevoAgente === 10){
       return res.status(422).json({
         success: false,
-        message: "Se alcanzo el limite de agentes para un grupo",
+        message: "Se alcanzo el limite de agentes para el grupo",
       });
     }
 
@@ -97,7 +97,7 @@ const updateAgente = async (req, res) => {
     if (agenteActualizado === 10){
       return res.status(422).json({
         success: false,
-        message: "Se alcanzo el limite de agentes para un grupo",
+        message: "Se alcanzo el limite de agentes para el grupo",
       });
     }
     

@@ -38,7 +38,7 @@ const getAllAgentes = async (user, filters = {}) => {
       `SELECT 
         a.idAgente as id,
         a.nombre as name,
-        a.apellido as lastName,
+        a.apellido as "lastName",
         a.email,
         a.telefono as phone,
         a.ci,
@@ -47,17 +47,19 @@ const getAllAgentes = async (user, filters = {}) => {
         a.especializacion as specialization,
         a.rol as role,
         a.estado,
-        a.fecha_creacion as joinDate,
-        a.idgrupo as groupId,
+        a.fecha_creacion as "joinDate",
+        a.idgrupo as "groupId",
+        g.nombre as "groupName",
         COALESCE(
-          (SELECT COUNT(*) FROM Inmueble i WHERE i.idagente = a.idAgente AND i.estado != 'eliminado'),
-          0
-        ) as propertiesCount,
+            (SELECT COUNT(*) FROM Inmueble i WHERE i.idagente = a.idAgente AND i.estado != 'eliminado'),
+            0
+        ) as "propertiesCount",
         COALESCE(
-          (SELECT ARRAY_AGG(i.idInmueble::text) FROM Inmueble i WHERE i.idagente = a.idAgente AND i.estado != 'eliminado'),
-          ARRAY[]::text[]
+            (SELECT ARRAY_AGG(i.idInmueble::text) FROM Inmueble i WHERE i.idagente = a.idAgente AND i.estado != 'eliminado'),
+            ARRAY[]::text[]
         ) as capturedProperties
       FROM Agente a
+      LEFT JOIN Grupo g ON a.idgrupo = g.idgrupo
       ${whereClause}
       ORDER BY 
         CASE WHEN a.estado = 'activo' THEN 0 ELSE 1 END,
@@ -69,7 +71,7 @@ const getAllAgentes = async (user, filters = {}) => {
       ...agente,
       active: agente.estado === 'activo',
       joinDate: agente.joinDate ? new Date(agente.joinDate).toISOString().split('T')[0] : null,
-      capturedProperties: agente.capturedProperties || []
+      capturedProperties: agente.capturedproperties || []
     })));
     
     return agentes;
@@ -85,7 +87,7 @@ const getAgenteById = async (id) => {
       `SELECT 
         a.idAgente as id,
         a.nombre as name,
-        a.apellido as lastName,
+        a.apellido as "lastName",
         a.email,
         a.telefono as phone,
         a.ci,
@@ -94,17 +96,19 @@ const getAgenteById = async (id) => {
         a.especializacion as specialization,
         a.rol as role,
         a.estado,
-        a.fecha_creacion as joinDate,
-        a.idgrupo as groupId,
+        a.fecha_creacion as "joinDate",
+        a.idgrupo as "groupId",
+        g.nombre as "groupName",
         COALESCE(
           (SELECT COUNT(*) FROM Inmueble i WHERE i.idagente = a.idAgente AND i.estado != 'eliminado'),
           0
-        ) as propertiesCount,
+        ) as "propertiesCount",
         COALESCE(
           (SELECT ARRAY_AGG(i.idInmueble::text) FROM Inmueble i WHERE i.idagente = a.idAgente AND i.estado != 'eliminado'),
           ARRAY[]::text[]
         ) as capturedProperties
       FROM Agente a
+      LEFT JOIN Grupo g ON a.idgrupo = g.idgrupo
       WHERE a.idAgente = $1 AND a.estado != 'eliminado'`,
       [id]
     );
@@ -121,7 +125,7 @@ const getAgenteById = async (id) => {
         : null,
       active: agente.estado === 'activo',
       joinDate: agente.joinDate ? new Date(agente.joinDate).toISOString().split('T')[0] : null,
-      capturedProperties: agente.capturedProperties || []
+      capturedProperties: agente.capturedproperties || []
     };
   } catch (error) {
     console.error("Error en getAgenteById:", error);
@@ -179,7 +183,7 @@ const createAgente = async (agenteData, user) => {
       RETURNING 
         idAgente as id,
         nombre as name,
-        apellido as lastName,
+        apellido as "lastName",
         email,
         telefono as phone,
         ci,
@@ -188,8 +192,8 @@ const createAgente = async (agenteData, user) => {
         especializacion as specialization,
         rol as role,
         estado,
-        fecha_creacion as joinDate,
-        idgrupo as groupId`,
+        fecha_creacion as "joinDate",
+        idgrupo as "groupId"`,
       [
         name, lastName, email, phone, ci, address,
         photo ? Buffer.from(photo.split(',')[1], 'base64') : null,
@@ -320,7 +324,7 @@ const updateAgente = async (id, agenteData, user) => {
        RETURNING 
         idAgente as id,
         nombre as name,
-        apellido as lastName,
+        apellido as "lastName",
         email,
         telefono as phone,
         ci,
@@ -329,8 +333,8 @@ const updateAgente = async (id, agenteData, user) => {
         especializacion as specialization,
         rol as role,
         estado,
-        fecha_creacion as joinDate,
-        idgrupo as groupId`,
+        fecha_creacion as "joinDate",
+        idgrupo as "groupId"`,
       values
     );
     
@@ -376,7 +380,7 @@ const updateAgenteEstado = async (id, estado, user) => {
      RETURNING 
       idAgente as id,
       nombre as name,
-      apellido as lastName,
+      apellido as "lastName",
       email,
       telefono as phone,
       ci,
@@ -385,8 +389,8 @@ const updateAgenteEstado = async (id, estado, user) => {
       especializacion as specialization,
       rol as role,
       estado,
-      fecha_creacion as joinDate,
-      idgrupo as groupId`,
+      fecha_creacion as "joinDate",
+      idgrupo as "groupId"`,
     params
   );
 
@@ -421,7 +425,7 @@ const getPropiedadesByAgente = async (idAgente) => {
         i.nro_baños as bathrooms,
         i.precio_capatacion_m as price,
         i.estado as status,
-        i.fecha_creacion as capturedDate,
+        i.fecha_creacion as "capturedDate",
         i.descripcion as description,
         i.condicion as condition,
         i.nro_pisos as floors,
@@ -460,7 +464,7 @@ const getAgentesByGrupo = async (grupoId) => {
       `SELECT 
         a.idAgente as id,
         a.nombre as name,
-        a.apellido as lastName,
+        a.apellido as "lastName",
         a.foto as photo,
         a.especializacion as specialization,
         a.rol as role,
@@ -493,16 +497,15 @@ const getAllGrupos = async () => {
         g.idgrupo as id,
         g.nombre as name,
         g.descripcion as description,
-        g.idlider as leaderId,
-
+        g.idlider as "leaderId",
+        CONCAT(l.nombre, ' ', l.apellido) as "leaderName",
         COALESCE(
           (SELECT COUNT(*) 
-           FROM Agente a 
-           WHERE a.idgrupo = g.idgrupo 
-           AND a.estado != 'eliminado'),
+            FROM Agente a 
+            WHERE a.idgrupo = g.idgrupo 
+            AND a.estado != 'eliminado'),
           0
-        ) as membersCount,
-
+        ) as "membersCount",
         COALESCE(
           (
             SELECT json_agg(
@@ -519,8 +522,8 @@ const getAllGrupos = async () => {
           ),
           '[]'
         ) as agents
-
       FROM Grupo g
+      LEFT JOIN Agente l ON g.idlider = l.idAgente
       ORDER BY g.nombre ASC`
     );
 
@@ -538,12 +541,14 @@ const getGrupoById = async (id) => {
         g.idgrupo as id,
         g.nombre as name,
         g.descripcion as description,
-        g.idlider as leaderId,
+        g.idlider as "leaderId",
+        CONCAT(l.nombre, ' ', l.apellido) as "leaderName",
         COALESCE(
           (SELECT COUNT(*) FROM Agente a WHERE a.idgrupo = g.idgrupo AND a.estado != 'eliminado'),
           0
-        ) as membersCount
+        ) as "membersCount"
       FROM Grupo g
+      LEFT JOIN Agente l ON g.idlider = l.idAgente
       WHERE g.idgrupo = $1`,
       [id]
     );
@@ -581,7 +586,7 @@ const createGrupo = async (grupoData) => {
         idgrupo as id,
         nombre as name,
         descripcion as description,
-        idlider as leaderId;`,
+        idlider as "leaderId";`,
       [name, description || null, leaderId || null]
     );
 
@@ -673,7 +678,7 @@ const updateGrupo = async (id, grupoData) => {
         g.idgrupo as id,
         g.nombre as name,
         g.descripcion as description,
-        g.idlider as leaderId`,
+        g.idlider as "leaderId"`,
       values
     );
 
@@ -699,12 +704,12 @@ const updateGrupo = async (id, grupoData) => {
       );
     }
 
-    if (grupo.leaderid) {
+    if (grupo.leaderId) {
       await query(
         `UPDATE Agente
          SET idgrupo = $1
          WHERE idAgente = $2`,
-        [grupo.id, grupo.leaderid]
+        [grupo.id, grupo.leaderId]
       );
     }
 
