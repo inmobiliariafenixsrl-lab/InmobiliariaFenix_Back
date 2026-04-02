@@ -11,5 +11,6 @@ router.post("/properties/save-progress", propertyManagementController.saveProper
 router.put("/properties/:id", propertyManagementController.updateProperty);
 router.patch("/properties/:id/status", propertyManagementController.updatePropertyStatus);
 router.delete("/properties/:id", propertyManagementController.deleteProperty);
+router.get("/properties/:id/documents", propertyManagementController.getPropertyDocuments);
 
 module.exports = router;

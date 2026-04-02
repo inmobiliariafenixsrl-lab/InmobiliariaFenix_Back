@@ -86,7 +86,6 @@ const validateStatus = (estado) => {
 // Función para guardar documentos
 const saveDocuments = async (propertyId, documents, tipoCambioCaptacion) => {
   try {
-    // Primero, obtener los tipos de documentos de la base de datos
     const tiposResult = await query(
       `SELECT idtipo_documento, nombre FROM documento_tipo`,
     );
@@ -96,7 +95,6 @@ const saveDocuments = async (propertyId, documents, tipoCambioCaptacion) => {
       tiposMap[tipo.nombre] = tipo.idtipo_documento;
     });
 
-    // Mapeo de nombres de documentos frontend a nombres en BD
     const documentMapping = {
       folioReal: "Folio Real / Vista Rápida",
       avaluo: "Avalúo",
@@ -105,21 +103,25 @@ const saveDocuments = async (propertyId, documents, tipoCambioCaptacion) => {
       informeLegal: "Informe legal del inmueble",
     };
 
-    // Para cada tipo de documento que viene del frontend
     for (const [key, files] of Object.entries(documents)) {
       if (files && files.length > 0) {
         const tipoNombre = documentMapping[key];
         const tipoId = tiposMap[tipoNombre];
 
         if (tipoId) {
-          // Eliminar documentos existentes de este tipo para este inmueble
+          // Eliminar documentos existentes de este tipo
           await query(
             `DELETE FROM Documento WHERE idinmueble = $1 AND idtipo_documento = $2`,
             [propertyId, tipoId],
           );
 
-          // Insertar cada archivo
+          // Insertar nuevos documentos
           for (const fileInfo of files) {
+            // Si el documento tiene ID, significa que ya existe y no debemos reinsertarlo
+            if (fileInfo.id) {
+              continue; // Saltar documentos existentes
+            }
+
             const fileMetadata = JSON.stringify({
               name: fileInfo.name,
               size: fileInfo.size,
@@ -188,7 +190,7 @@ const getPropertyDocuments = async (propertyId) => {
        FROM Documento d
        JOIN documento_tipo dt ON d.idtipo_documento = dt.idtipo_documento
        WHERE d.idinmueble = $1`,
-      [propertyId],
+      [propertyId]
     );
     return result.rows;
   } catch (error) {
@@ -470,7 +472,7 @@ const updatePropertyStatus = async (id, estado) => {
 };
 
 const deleteProperty = async (id) => {
-  try {
+  try { 
     const result = await query(
       `UPDATE Inmueble SET estado = 'eliminado' WHERE idinmueble = $1 RETURNING *`,
       [id],
@@ -481,6 +483,7 @@ const deleteProperty = async (id) => {
     throw error;
   }
 };
+
 
 module.exports = {
   getAllProperties,
