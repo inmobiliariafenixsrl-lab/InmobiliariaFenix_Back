@@ -514,10 +514,12 @@ const getAgentesByGrupo = async (grupoId) => {
   }
 };
 
-const getAllGrupos = async () => {
+const getAllGrupos = async (filters = {}) => {
   try {
-    const result = await query(
-      `SELECT 
+    const { sinLider = false } = filters;
+    
+    let queryText = `
+      SELECT 
         g.idgrupo as id,
         g.nombre as name,
         g.descripcion as description,
@@ -548,9 +550,17 @@ const getAllGrupos = async () => {
         ) as agents
       FROM Grupo g
       LEFT JOIN Agente l ON g.idlider = l.idAgente
-      ORDER BY g.nombre ASC`
-    );
-
+    `;
+    
+    const queryParams = [];
+    
+    if (sinLider) {
+      queryText += ` WHERE g.idlider IS NULL`;
+    }
+    
+    queryText += ` ORDER BY g.nombre ASC`;
+    
+    const result = await query(queryText, queryParams);
     return result.rows;
   } catch (error) {
     console.error("Error en getAllGrupos:", error);

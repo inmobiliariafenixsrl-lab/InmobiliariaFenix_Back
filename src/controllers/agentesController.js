@@ -192,7 +192,13 @@ const getAgentesByGrupo = async (req, res) => {
 
 const getGrupos = async (req, res) => {
   try {
-    const grupos = await agentesService.getAllGrupos();
+    const { sinLider } = req.query;
+    
+    const filters = {
+      sinLider: sinLider === 'true' || sinLider === '1'
+    };
+    
+    const grupos = await agentesService.getAllGrupos(filters);
     
     const gruposConFotos = grupos.map(grupo => ({
       ...grupo,
