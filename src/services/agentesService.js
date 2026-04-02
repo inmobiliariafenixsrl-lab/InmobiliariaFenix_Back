@@ -249,15 +249,31 @@ const updateAgente = async (id, agenteData, user) => {
       return null;
     }
 
-    if (groupId !== null && groupId !== undefined && groupId !== agenteActual.idgrupo) {
+    const isChangingRole = role !== undefined && role !== agenteActual.rol;
+    const isBecomingAdminOrModerator = isChangingRole && ['administrador', 'moderador'].includes(role);
+    const isLeavingTeamLeader = isChangingRole && agenteActual.rol === 'team_leader';
+    const isBecomingTeamLeader = isChangingRole && role === 'team_leader';
+    
+    let forceGroupIdNull = false;
+
+    if (isBecomingAdminOrModerator || isLeavingTeamLeader || isBecomingTeamLeader) {
+      if (agenteActual.idgrupo) {
+        if (agenteActual.rol === 'team_leader') {
+          await updateGrupo(agenteActual.idgrupo.toString(), { leaderId: null });
+        }
+        forceGroupIdNull = true;
+      }
+    }
+
+    if (!forceGroupIdNull && groupId !== null && groupId !== undefined && groupId !== agenteActual.idgrupo) {
       const countAgents = await query(
         `SELECT COUNT(*) as total_agentes
          FROM Agente
-         WHERE idgrupo = $1
-           AND estado != 'eliminado'`,
+         WHERE idgrupo = $1 AND estado != 'eliminado'`,
         [groupId]
       );
-      if (countAgents.rows[0].total_agentes >= 10) {
+      
+      if (parseInt(countAgents.rows[0].total_agentes) >= 10) {
         return 10;
       }
     }
@@ -265,7 +281,7 @@ const updateAgente = async (id, agenteData, user) => {
     const isTeamLeader = agenteActual.rol === 'team_leader';
     const isChangingGroup = groupId !== undefined && groupId !== agenteActual.idgrupo;
     
-    if (isTeamLeader && isChangingGroup) {
+    if (isTeamLeader && isChangingGroup && !isChangingRole) {
       if (agenteActual.idgrupo) {
         await updateGrupo(agenteActual.idgrupo.toString(), { leaderId: null });
       }
@@ -276,16 +292,15 @@ const updateAgente = async (id, agenteData, user) => {
           [groupId]
         );
         
-        if (grupoNuevo.rows.length > 0 && !grupoNuevo.rows[0].idlider) {
+        if (grupoNuevo.rows.length > 0) {
+          if (grupoNuevo.rows[0].idlider) {
+            return 'grupo_ocupado';
+          }
           await updateGrupo(groupId.toString(), { leaderId: id });
-        } else {
-          return 'grupo_ocupado';
         }
       }
     }
 
-    const estado = active === false ? 'inactivo' : 'activo';
-    
     const updates = [];
     const values = [];
     let paramIndex = 1;
@@ -314,10 +329,13 @@ const updateAgente = async (id, agenteData, user) => {
       updates.push(`direccion = $${paramIndex++}`);
       values.push(address);
     }
-    if (photo !== undefined && photo !== '' && photo !== null) {
+    
+    if (photo !== undefined && photo) {
       updates.push(`foto = $${paramIndex++}`);
-      values.push(Buffer.from(photo.split(',')[1], 'base64'));
+      const base64Data = photo.includes(',') ? photo.split(',')[1] : photo;
+      values.push(Buffer.from(base64Data, 'base64'));
     }
+    
     if (specialization !== undefined) {
       updates.push(`especializacion = $${paramIndex++}`);
       values.push(specialization);
@@ -326,11 +344,16 @@ const updateAgente = async (id, agenteData, user) => {
       updates.push(`rol = $${paramIndex++}`);
       values.push(role);
     }
-    if (groupId !== undefined) {
+    
+    if (forceGroupIdNull) {
+      updates.push(`idgrupo = NULL`);
+    } else if (groupId !== undefined) {
       updates.push(`idgrupo = $${paramIndex++}`);
       values.push(groupId || null);
     }
-    if (estado !== undefined) {
+    
+    if (active !== undefined) {
+      const estado = active === false ? 'inactivo' : 'activo';
       updates.push(`estado = $${paramIndex++}`);
       values.push(estado);
     }
@@ -370,7 +393,9 @@ const updateAgente = async (id, agenteData, user) => {
     return {
       ...agenteActualizado,
       active: agenteActualizado.estado === 'activo',
-      joinDate: agenteActualizado.joinDate ? new Date(agenteActualizado.joinDate).toISOString().split('T')[0] : null,
+      joinDate: agenteActualizado.joinDate 
+        ? new Date(agenteActualizado.joinDate).toISOString().split('T')[0] 
+        : null,
       photo: agenteActualizado.photo 
         ? `/api/agentes/photo/${agenteActualizado.id}`
         : null
