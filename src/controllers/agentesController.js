@@ -3,18 +3,27 @@ const agentesService = require("../services/agentesService");
 const getAgentes = async (req, res) => {
   try {
     const user = req.user;
-    const { searchTerm, sinGrupo, teamLeaderSinGrupo } = req.query;
+    const { 
+      searchTerm, 
+      sinGrupo, 
+      teamLeaderSinGrupo,
+      page = 1,
+      limit = 10
+    } = req.query;
     
     const filters = {
       searchTerm: searchTerm || null,
       sinGrupo: sinGrupo === 'true' || sinGrupo === true,
-      teamLeaderSinGrupo: teamLeaderSinGrupo === 'true' || teamLeaderSinGrupo === true
+      teamLeaderSinGrupo: teamLeaderSinGrupo === 'true' || teamLeaderSinGrupo === true,
+      page: parseInt(page),
+      limit: parseInt(limit)
     };
     
-    const agentes = await agentesService.getAllAgentes(user, filters);
+    const result = await agentesService.getAllAgentes(user, filters);
     res.status(200).json({
       success: true,
-      data: agentes
+      data: result.data,
+      pagination: result.pagination
     });
   } catch (error) {
     console.error("Error en getAgentes:", error);

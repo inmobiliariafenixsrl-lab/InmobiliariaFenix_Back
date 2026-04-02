@@ -3,7 +3,14 @@ const bcrypt = require("bcrypt");
 
 const getAllAgentes = async (user, filters = {}) => {
   try {
-    const { searchTerm, sinGrupo, teamLeaderSinGrupo } = filters;
+    const { 
+      searchTerm, 
+      sinGrupo, 
+      teamLeaderSinGrupo,
+      page = 1,
+      limit = 10 
+    } = filters;
+    
     let whereConditions = [];
     let queryParams = [];
     let paramCounter = 1;
@@ -34,6 +41,18 @@ const getAllAgentes = async (user, filters = {}) => {
       ? `WHERE ${whereConditions.join(' AND ')}`
       : '';
     
+    const offset = (page - 1) * limit;
+    
+    const countResult = await query(
+      `SELECT COUNT(*) as total
+       FROM Agente a
+       ${whereClause}`,
+      queryParams
+    );
+    
+    const total = parseInt(countResult.rows[0].total);
+    const totalPages = Math.ceil(total / limit);
+    
     const result = await query(
       `SELECT 
         a.idAgente as id,
@@ -63,8 +82,9 @@ const getAllAgentes = async (user, filters = {}) => {
       ${whereClause}
       ORDER BY 
         CASE WHEN a.estado = 'activo' THEN 0 ELSE 1 END,
-        a.nombre ASC`,
-      queryParams
+        a.nombre ASC
+      LIMIT $${paramCounter} OFFSET $${paramCounter + 1}`,
+      [...queryParams, limit, offset]
     );
     
     const agentes = setPhotoURL(result.rows.map(agente => ({
@@ -74,7 +94,17 @@ const getAllAgentes = async (user, filters = {}) => {
       capturedProperties: agente.capturedproperties || []
     })));
     
-    return agentes;
+    return {
+      data: agentes,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      }
+    };
   } catch (error) {
     console.error("Error en getAllAgentes:", error);
     throw error;
@@ -121,7 +151,7 @@ const getAgenteById = async (id) => {
     return {
       ...agente,
       photo: agente.photo 
-        ? `/api/agentes/photo/${agente.id}`
+        ? `/agentes/photo/${agente.id}`
         : null,
       active: agente.estado === 'activo',
       joinDate: agente.joinDate ? new Date(agente.joinDate).toISOString().split('T')[0] : null,
@@ -209,7 +239,7 @@ const createAgente = async (agenteData, user) => {
       propertiesCount: 0,
       capturedProperties: [],
       photo: nuevoAgente.photo 
-        ? `/api/agentes/photo/${agente.id}`
+        ? `/agentes/photo/${agente.id}`
         : null
     };
   } catch (error) {
@@ -330,10 +360,14 @@ const updateAgente = async (id, agenteData, user) => {
       values.push(address);
     }
     
-    if (photo !== undefined && photo) {
-      updates.push(`foto = $${paramIndex++}`);
-      const base64Data = photo.includes(',') ? photo.split(',')[1] : photo;
-      values.push(Buffer.from(base64Data, 'base64'));
+    if (photo !== undefined) {
+      if (photo === null || photo === '') {
+        updates.push(`foto = NULL`);
+      } else {
+        updates.push(`foto = $${paramIndex++}`);
+        const base64Data = photo.includes(',') ? photo.split(',')[1] : photo;
+        values.push(Buffer.from(base64Data, 'base64'));
+      }
     }
     
     if (specialization !== undefined) {
@@ -397,7 +431,7 @@ const updateAgente = async (id, agenteData, user) => {
         ? new Date(agenteActualizado.joinDate).toISOString().split('T')[0] 
         : null,
       photo: agenteActualizado.photo 
-        ? `/api/agentes/photo/${agenteActualizado.id}`
+        ? `/agentes/photo/${agenteActualizado.id}`
         : null
     };
   } catch (error) {
@@ -455,7 +489,7 @@ const updateAgenteEstado = async (id, estado, user) => {
       ? new Date(agente.joinDate).toISOString().split('T')[0]
       : null,
     photo: agente.photo 
-      ? `/api/agentes/photo/${agente.id}`
+      ? `/agentes/photo/${agente.id}`
       : null
   };
 };
@@ -528,7 +562,7 @@ const getAgentesByGrupo = async (grupoId) => {
       ...agente,
       active: estado === 'activo',
       photo: agente.photo 
-        ? `/api/agentes/photo/${agente.id}`
+        ? `/agentes/photo/${agente.id}`
         : null
     }));
     
@@ -837,7 +871,7 @@ const setPhotoURL = (agentes) => {
   return agentes.map(agente => ({
     ...agente,
     photo: agente.photo 
-      ? `/api/agentes/photo/${agente.id}`
+      ? `/agentes/photo/${agente.id}`
       : null
   }));
 };

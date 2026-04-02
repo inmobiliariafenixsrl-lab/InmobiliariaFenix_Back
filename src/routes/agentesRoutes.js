@@ -4,6 +4,9 @@ const agentesController = require('../controllers/agentesController');
 const { authenticate, authorize } = require('../middleware/loginmiddleware');
 
 // Rutas públicas (si las hay)
+router.get('/photo/:id',
+  agentesController.getAgentePhoto
+);
 
 // Rutas protegidas - requieren autenticación
 router.use(authenticate);
@@ -65,10 +68,6 @@ router.put('/grupo/:id',
 router.delete('/grupo/:id', 
   authorize(['administrador']), 
   agentesController.deleteGrupo
-);
-
-router.get('/photo/:id',
-  agentesController.getAgentePhoto
 );
 
 module.exports = router;
