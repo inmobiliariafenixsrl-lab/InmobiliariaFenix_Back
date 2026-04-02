@@ -231,6 +231,16 @@ const deleteProperty = async (req, res) => {
     res.status(500).json({ error: "Error al eliminar el inmueble" });
   }
 };
+const getPropertyDocuments = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const documents = await propertyManagementService.getPropertyDocuments(id);
+    res.status(200).json(documents);
+  } catch (error) {
+    console.error("Error in getPropertyDocuments:", error);
+    res.status(500).json({ error: "Error al obtener los documentos del inmueble" });
+  }
+};
 
 module.exports = {
   getAllProperties,
@@ -240,4 +250,5 @@ module.exports = {
   updateProperty,
   updatePropertyStatus,
   deleteProperty,
+  getPropertyDocuments,
 };
