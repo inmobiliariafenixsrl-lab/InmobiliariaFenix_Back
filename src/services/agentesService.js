@@ -234,19 +234,6 @@ const updateAgente = async (id, agenteData, user) => {
       active
     } = agenteData;
 
-    if (groupId !== null && groupId !== undefined) {
-      const countAgents = await query(
-      `SELECT COUNT(*) as total_agentes
-        FROM Agente
-        WHERE idgrupo = $1
-          AND estado != 'eliminado'`,
-      [groupId]
-      );
-      if (countAgents.rows[0].total_agentes >= 10){
-        return 10;
-      }
-    }
-    
     const currentAgente = await query(
       'SELECT * FROM Agente WHERE idAgente = $1 AND estado != $2',
       [id, 'eliminado']
@@ -256,10 +243,47 @@ const updateAgente = async (id, agenteData, user) => {
       return null;
     }
 
-    if (user.rol === 'team_leader' && currentAgente.rows[0].idgrupo !== user.idgrupo) {
-      return null
+    const agenteActual = currentAgente.rows[0];
+
+    if (user.rol === 'team_leader' && agenteActual.idgrupo !== user.idgrupo) {
+      return null;
     }
+
+    if (groupId !== null && groupId !== undefined && groupId !== agenteActual.idgrupo) {
+      const countAgents = await query(
+        `SELECT COUNT(*) as total_agentes
+         FROM Agente
+         WHERE idgrupo = $1
+           AND estado != 'eliminado'`,
+        [groupId]
+      );
+      if (countAgents.rows[0].total_agentes >= 10) {
+        return 10;
+      }
+    }
+
+    const isTeamLeader = agenteActual.rol === 'team_leader';
+    const isChangingGroup = groupId !== undefined && groupId !== agenteActual.idgrupo;
     
+    if (isTeamLeader && isChangingGroup) {
+      if (agenteActual.idgrupo) {
+        await updateGrupo(agenteActual.idgrupo.toString(), { leaderId: null });
+      }
+      
+      if (groupId && groupId !== null) {
+        const grupoNuevo = await query(
+          'SELECT idlider FROM Grupo WHERE idgrupo = $1',
+          [groupId]
+        );
+        
+        if (grupoNuevo.rows.length > 0 && !grupoNuevo.rows[0].idlider) {
+          await updateGrupo(groupId.toString(), { leaderId: id });
+        } else {
+          return 'grupo_ocupado';
+        }
+      }
+    }
+
     const estado = active === false ? 'inactivo' : 'activo';
     
     const updates = [];

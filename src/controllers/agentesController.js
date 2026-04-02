@@ -100,6 +100,12 @@ const updateAgente = async (req, res) => {
         message: "Se alcanzo el limite de agentes para el grupo",
       });
     }
+    if (agenteActualizado === 'grupo_ocupado'){
+      return res.status(409).json({
+        success: false,
+        message: "El equipo ya cuenta con un team leader",
+      });
+    }
     
     res.status(200).json({
       success: true,
