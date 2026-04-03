@@ -1,4 +1,5 @@
 const { query } = require("../../db");
+const emailService = require("./EmailService"); // SOLO AÑADIR ESTA LÍNEA
 
 class DocumentManagementService {
   async getPropertiesInReview() {
@@ -154,11 +155,30 @@ class DocumentManagementService {
         );
       }
       
+      // Obtener el título del inmueble antes de actualizar
+      const propertyResult = await query(
+        `SELECT titulo FROM inmueble WHERE idinmueble = $1`,
+        [propertyId]
+      );
+      
+      const propertyTitle = propertyResult.rows[0]?.titulo || 'Sin título';
+      
       // Actualizar estado del inmueble a activo
       await query(
         `UPDATE inmueble SET estado = 'activo', observacion = NULL WHERE idinmueble = $1`,
         [propertyId]
       );
+      
+      // SOLO AÑADIR ESTAS LÍNEAS PARA ENVIAR CORREO
+      console.log(`📧 Enviando notificación para la propiedad: ${propertyTitle}`);
+      const emailResult = await emailService.sendPropertyApprovedEmail(propertyId, propertyTitle);
+      
+      if (emailResult.success) {
+        console.log(`✅ Notificación enviada a ${emailResult.count} agentes`);
+      } else {
+        console.log(`⚠️ La propiedad se aprobó pero hubo un problema con el envío de correos: ${emailResult.error}`);
+      }
+      // FIN DE LAS LÍNEAS AÑADIDAS
       
       return { success: true };
       
