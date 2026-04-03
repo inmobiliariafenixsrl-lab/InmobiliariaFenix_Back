@@ -67,11 +67,32 @@ const createAgente = async (req, res) => {
     const user = req.user;
     const nuevoAgente = await agentesService.createAgente(agenteData, user);
     
-    if (nuevoAgente === 10){
-      return res.status(422).json({
-        success: false,
-        message: "Se alcanzo el limite de agentes para el grupo",
-      });
+    if (nuevoAgente?.error) {
+      switch (nuevoAgente.error) {
+        case 'LIMIT_REACHED':
+          return res.status(422).json({
+            success: false,
+            message: "Se alcanzó el límite de agentes para el grupo",
+          });
+        
+        case 'EMAIL_EXISTS':
+          return res.status(409).json({
+            success: false,
+            message: "El email ya está registrado",
+          });
+        
+        case 'CI_EXISTS':
+          return res.status(409).json({
+            success: false,
+            message: "El CI ya está registrado",
+          });
+        
+        default:
+          return res.status(400).json({
+            success: false,
+            message: "Error al crear el agente",
+          });
+      }
     }
 
     res.status(201).json({

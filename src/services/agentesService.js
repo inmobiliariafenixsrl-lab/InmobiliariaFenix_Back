@@ -192,7 +192,27 @@ const createAgente = async (agenteData, user) => {
       [groupId]
       );
       if (countAgents.rows[0].total_agentes >= 10){
-        return 10;
+        return { error: 'LIMIT_REACHED' };
+      }
+    }
+    
+    if (email) {
+      const emailExists = await query(
+        `SELECT idAgente FROM Agente WHERE email = $1`,
+        [email]
+      );
+      if (emailExists.rows.length > 0) {
+        return { error: 'EMAIL_EXISTS' };
+      }
+    }
+    
+    if (ci) {
+      const ciExists = await query(
+        `SELECT idAgente FROM Agente WHERE ci = $1`,
+        [ci]
+      );
+      if (ciExists.rows.length > 0) {
+        return { error: 'CI_EXISTS' };
       }
     }
     
@@ -239,11 +259,21 @@ const createAgente = async (agenteData, user) => {
       propertiesCount: 0,
       capturedProperties: [],
       photo: nuevoAgente.photo 
-        ? `/agentes/photo/${agente.id}`
+        ? `/agentes/photo/${nuevoAgente.id}`
         : null
     };
   } catch (error) {
     console.error("Error en createAgente:", error);
+    
+    if (error.code === '23505') {
+      if (error.constraint === 'agente_email_unique') {
+        return { error: 'EMAIL_EXISTS' };
+      }
+      if (error.constraint === 'agente_ci_unique') {
+        return { error: 'CI_EXISTS' };
+      }
+    }
+    
     throw error;
   }
 };
