@@ -1,5 +1,5 @@
 const { query } = require("../../db");
-const emailService = require("./EmailService"); // SOLO AÑADIR ESTA LÍNEA
+const emailService = require("./EmailService");
 
 class DocumentManagementService {
   async getPropertiesInReview() {
@@ -169,16 +169,19 @@ class DocumentManagementService {
         [propertyId]
       );
       
-      // SOLO AÑADIR ESTAS LÍNEAS PARA ENVIAR CORREO
-      console.log(`📧 Enviando notificación para la propiedad: ${propertyTitle}`);
-      const emailResult = await emailService.sendPropertyApprovedEmail(propertyId, propertyTitle);
-      
-      if (emailResult.success) {
-        console.log(`✅ Notificación enviada a ${emailResult.count} agentes`);
-      } else {
-        console.log(`⚠️ La propiedad se aprobó pero hubo un problema con el envío de correos: ${emailResult.error}`);
-      }
-      // FIN DE LAS LÍNEAS AÑADIDAS
+      // Enviar correo en segundo plano (sin await para no bloquear la respuesta)
+      // Esto permite que la aprobación sea inmediata y el correo se envíe en paralelo
+      emailService.sendPropertyApprovedEmail(propertyId, propertyTitle)
+        .then(result => {
+          if (result.success) {
+            console.log(`✅ Notificación enviada a ${result.count} agentes para la propiedad: ${propertyTitle}`);
+          } else {
+            console.log(`⚠️ La propiedad ${propertyTitle} se aprobó pero hubo un problema con el envío de correos: ${result.error}`);
+          }
+        })
+        .catch(error => {
+          console.error(`❌ Error enviando notificación para ${propertyTitle}:`, error.message);
+        });
       
       return { success: true };
       
