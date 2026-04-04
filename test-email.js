@@ -3,14 +3,20 @@ require('dotenv').config();
 const nodemailer = require('nodemailer');
 const dns = require('dns');
 
-// FORZAR IPv4 - Esta es la clave para que funcione
+// FORZAR IPv4
 dns.setDefaultResultOrder('ipv4first');
 
 async function testEmail() {
   console.log('=== TEST DE CONFIGURACIÓN DE EMAIL ===');
   console.log('SMTP_USER:', process.env.SMTP_USER);
   console.log('SMTP_PASS:', process.env.SMTP_PASS ? '✅ Configurada' : '❌ No configurada');
-  console.log('Forzando IPv4...');
+  
+  // Eliminar espacios de la contraseña si los tiene
+  let password = process.env.SMTP_PASS;
+  if (password && password.includes(' ')) {
+    password = password.replace(/\s/g, '');
+    console.log('⚠️ Se eliminaron espacios de la contraseña');
+  }
   
   const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
@@ -18,13 +24,12 @@ async function testEmail() {
     secure: false,
     auth: {
       user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
+      pass: password,
     },
-    family: 4,           // Forzar IPv4
-    localAddress: '0.0.0.0', // Forzar IPv4
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
+    family: 4,  // Solo forzar IPv4, sin localAddress
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 15000,
   });
   
   try {
@@ -45,12 +50,6 @@ async function testEmail() {
   } catch (error) {
     console.error('❌ Error de conexión:', error.message);
     console.error('Código:', error.code);
-    
-    // Diagnóstico adicional
-    console.log('\n--- DIAGNÓSTICO ---');
-    console.log('1. Verifica que la contraseña de aplicación sea correcta');
-    console.log('2. Verifica que tu firewall no bloquee el puerto 587');
-    console.log('3. Prueba con: telnet smtp.gmail.com 587');
   }
 }
 
