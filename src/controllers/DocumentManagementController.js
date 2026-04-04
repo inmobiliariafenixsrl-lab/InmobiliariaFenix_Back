@@ -11,6 +11,17 @@ class DocumentManagementController {
     }
   }
 
+  async getPropertyById(req, res) {
+    try {
+      const { propertyId } = req.params;
+      const property = await documentManagementService.getPropertyById(propertyId);
+      res.json(property);
+    } catch (error) {
+      console.error("Error in getPropertyById:", error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
   async getPropertyDocuments(req, res) {
     try {
       const { propertyId } = req.params;
