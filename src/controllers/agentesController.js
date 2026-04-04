@@ -244,12 +244,13 @@ const getAgentesByGrupo = async (req, res) => {
 const getGrupos = async (req, res) => {
   try {
     const { sinLider } = req.query;
+    const user = req.user;
     
     const filters = {
       sinLider: sinLider === 'true' || sinLider === '1'
     };
     
-    const grupos = await agentesService.getAllGrupos(filters);
+    const grupos = await agentesService.getAllGrupos(filters, user);
     
     const gruposConFotos = grupos.map(grupo => ({
       ...grupo,

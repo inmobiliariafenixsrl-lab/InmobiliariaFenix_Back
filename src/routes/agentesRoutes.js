@@ -19,7 +19,7 @@ router.get('/',
 
 // Obtener todos los grupos
 router.get('/grupos',
-  authorize(['administrador']),
+  authorize(['administrador', 'team_leader']),
   agentesController.getGrupos);
 
 // Obtener agente por ID

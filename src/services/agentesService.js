@@ -631,7 +631,7 @@ const getAgentesByGrupo = async (grupoId) => {
   }
 };
 
-const getAllGrupos = async (filters = {}) => {
+const getAllGrupos = async (filters = {}, user) => {
   try {
     const { sinLider = false } = filters;
     
@@ -670,9 +670,21 @@ const getAllGrupos = async (filters = {}) => {
     `;
     
     const queryParams = [];
+    let conditions = [];
+    if (user.rol === 'team_leader') {
+      if (!user.idgrupo) {
+        return [];
+      }
+      conditions.push(`g.idgrupo = $${queryParams.length + 1}`);
+      queryParams.push(user.idgrupo);
+    }
     
     if (sinLider) {
-      queryText += ` WHERE g.idlider IS NULL`;
+      conditions.push(`g.idlider IS NULL`);
+    }
+    
+    if (conditions.length > 0) {
+      queryText += ` WHERE ${conditions.join(' AND ')}`;
     }
     
     queryText += ` ORDER BY g.nombre ASC`;
