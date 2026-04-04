@@ -116,24 +116,45 @@ const updateAgente = async (req, res) => {
     const agenteData = req.body;
     const user = req.user;
     const agenteActualizado = await agentesService.updateAgente(id, agenteData, user);
+
+    if (agenteActualizado?.error) {
+      switch (agenteActualizado.error) {
+        case 'LIMIT_REACHED':
+          return res.status(422).json({
+            success: false,
+            message: "Se alcanzó el límite de agentes para el grupo",
+          });
+        
+        case 'EMAIL_EXISTS':
+          return res.status(409).json({
+            success: false,
+            message: "El email ya está registrado",
+          });
+        
+        case 'CI_EXISTS':
+          return res.status(409).json({
+            success: false,
+            message: "El CI ya está registrado",
+          });
+        
+        case 'GRUPO_OCUPADO':
+          return res.status(409).json({
+            success: false,
+            message: "El equipo ya cuenta con un team leader",
+          });
+
+        default:
+          return res.status(400).json({
+            success: false,
+            message: "Error al actualizar el agente",
+          });
+      }
+    }
     
     if (!agenteActualizado) {
       return res.status(404).json({
         success: false,
         message: "Agente no encontrado"
-      });
-    }
-
-    if (agenteActualizado === 10){
-      return res.status(422).json({
-        success: false,
-        message: "Se alcanzo el limite de agentes para el grupo",
-      });
-    }
-    if (agenteActualizado === 'grupo_ocupado'){
-      return res.status(409).json({
-        success: false,
-        message: "El equipo ya cuenta con un team leader",
       });
     }
     

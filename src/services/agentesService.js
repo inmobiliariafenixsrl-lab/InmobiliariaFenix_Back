@@ -43,55 +43,53 @@ const getAllAgentes = async (user, filters = {}) => {
     
     const offset = (page - 1) * limit;
     
-    const countResult = await query(
-      `SELECT COUNT(*) as total
-       FROM Agente a
-       ${whereClause}`,
-      queryParams
-    );
+    const [countResult, result] = await Promise.all([
+      query(
+        `SELECT COUNT(*) as total
+         FROM Agente a
+         ${whereClause}`,
+        queryParams
+      ),
+      query(
+        `SELECT 
+          a.idAgente as id,
+          a.nombre as name,
+          a.apellido as "lastName",
+          a.email,
+          a.telefono as phone,
+          a.ci,
+          a.direccion as address,
+          a.foto as photo,
+          a.especializacion as specialization,
+          a.rol as role,
+          a.estado,
+          a.fecha_creacion as "joinDate",
+          a.idgrupo as "groupId",
+          g.nombre as "groupName",
+          COALESCE(COUNT(i.idInmueble), 0) as "propertiesCount"
+        FROM Agente a
+        LEFT JOIN Grupo g ON a.idgrupo = g.idgrupo
+        LEFT JOIN Inmueble i ON i.idagente = a.idAgente AND i.estado != 'eliminado'
+        ${whereClause}
+        GROUP BY 
+          a.idAgente,
+          g.nombre
+        ORDER BY 
+          CASE WHEN a.estado = 'activo' THEN 0 ELSE 1 END,
+          a.nombre ASC
+        LIMIT $${paramCounter} OFFSET $${paramCounter + 1}`,
+        [...queryParams, limit, offset]
+      )
+    ]);
     
     const total = parseInt(countResult.rows[0].total);
     const totalPages = Math.ceil(total / limit);
-    
-    const result = await query(
-      `SELECT 
-        a.idAgente as id,
-        a.nombre as name,
-        a.apellido as "lastName",
-        a.email,
-        a.telefono as phone,
-        a.ci,
-        a.direccion as address,
-        a.foto as photo,
-        a.especializacion as specialization,
-        a.rol as role,
-        a.estado,
-        a.fecha_creacion as "joinDate",
-        a.idgrupo as "groupId",
-        g.nombre as "groupName",
-        COALESCE(
-            (SELECT COUNT(*) FROM Inmueble i WHERE i.idagente = a.idAgente AND i.estado != 'eliminado'),
-            0
-        ) as "propertiesCount",
-        COALESCE(
-            (SELECT ARRAY_AGG(i.idInmueble::text) FROM Inmueble i WHERE i.idagente = a.idAgente AND i.estado != 'eliminado'),
-            ARRAY[]::text[]
-        ) as capturedProperties
-      FROM Agente a
-      LEFT JOIN Grupo g ON a.idgrupo = g.idgrupo
-      ${whereClause}
-      ORDER BY 
-        CASE WHEN a.estado = 'activo' THEN 0 ELSE 1 END,
-        a.nombre ASC
-      LIMIT $${paramCounter} OFFSET $${paramCounter + 1}`,
-      [...queryParams, limit, offset]
-    );
     
     const agentes = setPhotoURL(result.rows.map(agente => ({
       ...agente,
       active: agente.estado === 'activo',
       joinDate: agente.joinDate ? new Date(agente.joinDate).toISOString().split('T')[0] : null,
-      capturedProperties: agente.capturedproperties || []
+      propertiesCount: parseInt(agente.propertiesCount) || 0,
     })));
     
     return {
@@ -148,10 +146,11 @@ const getAgenteById = async (id) => {
     }
     
     const agente = result.rows[0];
+    const date = Date.now()
     return {
       ...agente,
       photo: agente.photo 
-        ? `/agentes/photo/${agente.id}`
+        ? `/agentes/photo/${agente.id}?t=${date}`
         : null,
       active: agente.estado === 'activo',
       joinDate: agente.joinDate ? new Date(agente.joinDate).toISOString().split('T')[0] : null,
@@ -259,7 +258,7 @@ const createAgente = async (agenteData, user) => {
       propertiesCount: 0,
       capturedProperties: [],
       photo: nuevoAgente.photo 
-        ? `/agentes/photo/${nuevoAgente.id}`
+        ? `/agentes/photo/${nuevoAgente.id}?t=${Date.now()}`
         : null
     };
   } catch (error) {
@@ -290,9 +289,10 @@ const updateAgente = async (id, agenteData, user) => {
       photo,
       specialization,
       role,
-      groupId,
+      groupId: groupIdRaw,
       active
     } = agenteData;
+    const groupId = groupIdRaw ? Number(groupIdRaw) : null;
 
     const currentAgente = await query(
       'SELECT * FROM Agente WHERE idAgente = $1 AND estado != $2',
@@ -307,6 +307,26 @@ const updateAgente = async (id, agenteData, user) => {
 
     if (user.rol === 'team_leader' && agenteActual.idgrupo !== user.idgrupo) {
       return null;
+    }
+
+    if (email !== undefined && email !== agenteActual.email) {
+      const emailExists = await query(
+        `SELECT idAgente FROM Agente WHERE email = $1 AND idAgente != $2`,
+        [email, id]
+      );
+      if (emailExists.rows.length > 0) {
+        return { error: 'EMAIL_EXISTS' };
+      }
+    }
+
+    if (ci !== undefined && ci !== agenteActual.ci) {
+      const ciExists = await query(
+        `SELECT idAgente FROM Agente WHERE ci = $1 AND idAgente != $2`,
+        [ci, id]
+      );
+      if (ciExists.rows.length > 0) {
+        return { error: 'CI_EXISTS' };
+      }
     }
 
     const isChangingRole = role !== undefined && role !== agenteActual.rol;
@@ -324,7 +344,6 @@ const updateAgente = async (id, agenteData, user) => {
         forceGroupIdNull = true;
       }
     }
-
     if (!forceGroupIdNull && groupId !== null && groupId !== undefined && groupId !== agenteActual.idgrupo) {
       const countAgents = await query(
         `SELECT COUNT(*) as total_agentes
@@ -334,7 +353,7 @@ const updateAgente = async (id, agenteData, user) => {
       );
       
       if (parseInt(countAgents.rows[0].total_agentes) >= 10) {
-        return 10;
+        return { error: 'LIMIT_REACHED' };
       }
     }
 
@@ -354,7 +373,7 @@ const updateAgente = async (id, agenteData, user) => {
         
         if (grupoNuevo.rows.length > 0) {
           if (grupoNuevo.rows[0].idlider) {
-            return 'grupo_ocupado';
+            return { error: 'GRUPO_OCUPADO'};
           }
           await updateGrupo(groupId.toString(), { leaderId: id });
         }
@@ -461,11 +480,20 @@ const updateAgente = async (id, agenteData, user) => {
         ? new Date(agenteActualizado.joinDate).toISOString().split('T')[0] 
         : null,
       photo: agenteActualizado.photo 
-        ? `/agentes/photo/${agenteActualizado.id}`
+        ? `/agentes/photo/${agenteActualizado.id}?t=${Date.now()}`
         : null
     };
   } catch (error) {
     console.error("Error en updateAgente:", error);
+    if (error.code === '23505') {
+      if (error.constraint === 'agente_email_unique') {
+        return { error: 'EMAIL_EXISTS' };
+      }
+      if (error.constraint === 'agente_ci_unique') {
+        return { error: 'CI_EXISTS' };
+      }
+    }
+    
     throw error;
   }
 };
@@ -519,7 +547,7 @@ const updateAgenteEstado = async (id, estado, user) => {
       ? new Date(agente.joinDate).toISOString().split('T')[0]
       : null,
     photo: agente.photo 
-      ? `/agentes/photo/${agente.id}`
+      ? `/agentes/photo/${agente.id}?t=${Date.now()}`
       : null
   };
 };
@@ -592,7 +620,7 @@ const getAgentesByGrupo = async (grupoId) => {
       ...agente,
       active: estado === 'activo',
       photo: agente.photo 
-        ? `/agentes/photo/${agente.id}`
+        ? `/agentes/photo/${agente.id}?t=${Date.now()}`
         : null
     }));
     
@@ -897,11 +925,11 @@ const setPhotoURL = (agentes) => {
   if (!Array.isArray(agentes) || agentes.length === 0) {
     return [];
   }
-
+  const date = Date.now();
   return agentes.map(agente => ({
     ...agente,
     photo: agente.photo 
-      ? `/agentes/photo/${agente.id}`
+      ? `/agentes/photo/${agente.id}?t=${date}`
       : null
   }));
 };
