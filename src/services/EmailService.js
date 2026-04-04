@@ -1,33 +1,15 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const { query } = require("../../db");
 
 class EmailService {
   constructor() {
-    // Verificar que las variables existen
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      console.error('❌ ERROR: Faltan variables SMTP_USER o SMTP_PASS en .env');
-      console.error('SMTP_USER:', process.env.SMTP_USER ? '✓' : '✗');
-      console.error('SMTP_PASS:', process.env.SMTP_PASS ? '✓' : '✗');
+    // Verificar que la API key existe
+    if (!process.env.RESEND_API_KEY) {
+      console.error('❌ ERROR: Falta RESEND_API_KEY en .env');
     }
     
-    // Configuración mejorada
-    this.transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 587,
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-      family: 4,
-      connectionTimeout: 30000,
-      greetingTimeout: 30000,
-      socketTimeout: 30000,
-      // Ignorar certificados SSL para pruebas
-      tls: {
-        rejectUnauthorized: false
-      }
-    });
+    // Inicializar Resend
+    this.resend = new Resend(process.env.RESEND_API_KEY);
   }
 
   async getAgentesEmails() {
@@ -47,8 +29,8 @@ class EmailService {
   async sendPropertyApprovedEmail(propertyId, propertyTitle) {
     try {
       // Verificar configuración antes de enviar
-      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-        throw new Error('Configuración de correo incompleta');
+      if (!process.env.RESEND_API_KEY) {
+        throw new Error('Configuración de Resend incompleta: falta RESEND_API_KEY');
       }
       
       const agentes = await this.getAgentesEmails();
@@ -181,25 +163,30 @@ class EmailService {
         </html>
       `;
 
+      // Obtener array de emails
       const emails = agentes.map(a => a.email);
       
-      const mailOptions = {
-        from: process.env.SMTP_FROM || '"Inmobiliaria Fenix" <inmobiliariafenixsrl@gmail.com>',
-        to: 'inmobiliariafenixsrl@gmail.com',
-        bcc: emails.join(', '),
+      // Enviar con Resend (puede enviar a múltiples destinatarios directamente)
+      const { data, error } = await this.resend.emails.send({
+        from: 'Inmobiliaria Fenix <onboarding@resend.dev>', // Dominio temporal de Resend
+        to: emails, // Resend acepta array de destinatarios
         subject: subject,
-        html: html
-      };
+        html: html,
+      });
 
-      const info = await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Correo enviado exitosamente a ${agentes.length} agentes`);
+      if (error) {
+        throw error;
+      }
+
+      console.log(`✅ Correo enviado exitosamente a ${agentes.length} agentes via Resend`);
       console.log(`📧 Propiedad: ${propertyTitle}`);
       console.log(`👥 Destinatarios: ${emails.join(', ')}`);
+      console.log(`📨 ID del correo: ${data?.id}`);
       
-      return { success: true, count: agentes.length };
+      return { success: true, count: agentes.length, messageId: data?.id };
       
     } catch (error) {
-      console.error("❌ Error enviando correo:", error);
+      console.error("❌ Error enviando correo con Resend:", error);
       return { success: false, error: error.message };
     }
   }
