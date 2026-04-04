@@ -3,20 +3,27 @@ const { query } = require("../../db");
 
 class EmailService {
   constructor() {
-    // Configuración para Gmail con puerto 465 (SSL)
+    // Verificar que las variables existen
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.error('❌ ERROR: Faltan variables SMTP_USER o SMTP_PASS en .env');
+      console.error('SMTP_USER:', process.env.SMTP_USER ? '✓' : '✗');
+      console.error('SMTP_PASS:', process.env.SMTP_PASS ? '✓' : '✗');
+    }
+    
+    // Configuración mejorada
     this.transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
-      port: 465,
-      secure: true, // true para puerto 465
+      port: 587,
+      secure: false,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
-      family: 4, // Forzar IPv4
+      family: 4,
       connectionTimeout: 30000,
       greetingTimeout: 30000,
       socketTimeout: 30000,
-      // Deshabilitar TLS para pruebas (opcional)
+      // Ignorar certificados SSL para pruebas
       tls: {
         rejectUnauthorized: false
       }
@@ -39,6 +46,11 @@ class EmailService {
 
   async sendPropertyApprovedEmail(propertyId, propertyTitle) {
     try {
+      // Verificar configuración antes de enviar
+      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        throw new Error('Configuración de correo incompleta');
+      }
+      
       const agentes = await this.getAgentesEmails();
       
       if (agentes.length === 0) {
@@ -153,14 +165,6 @@ class EmailService {
                   🔍 Ver Listado de Inmuebles
                 </a>
               </div>
-              
-              <p style="font-size: 14px; color: #666; margin-top: 20px;">
-                <strong>¿Qué puedes hacer?</strong><br>
-                • Revisar la documentación del inmueble<br>
-                • Contactar al propietario<br>
-                • Programar visitas<br>
-                • Compartir con clientes interesados
-              </p>
               
               <div class="highlight">
                 <strong>🔗 Enlace directo:</strong><br>
