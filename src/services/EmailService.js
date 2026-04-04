@@ -3,21 +3,30 @@ const { query } = require("../../db");
 
 class EmailService {
   constructor() {
-    // Configuración para Gmail FORZANDO IPv4 (SOLUCIÓN AL ERROR ENETUNREACH)
+    // Verificar que las variables existen
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.error('❌ ERROR: Faltan variables SMTP_USER o SMTP_PASS en .env');
+      console.error('SMTP_USER:', process.env.SMTP_USER ? '✓' : '✗');
+      console.error('SMTP_PASS:', process.env.SMTP_PASS ? '✓' : '✗');
+    }
+    
+    // Configuración mejorada
     this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.SMTP_PORT) || 587,
-      secure: false, // false para puerto 587
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
-      // FORZAR IPv4 - SOLUCIONA EL ERROR "ENETUNREACH"
       family: 4,
-      // Timeouts para evitar que se cuelgue
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 10000,
+      connectionTimeout: 30000,
+      greetingTimeout: 30000,
+      socketTimeout: 30000,
+      // Ignorar certificados SSL para pruebas
+      tls: {
+        rejectUnauthorized: false
+      }
     });
   }
 
@@ -37,6 +46,11 @@ class EmailService {
 
   async sendPropertyApprovedEmail(propertyId, propertyTitle) {
     try {
+      // Verificar configuración antes de enviar
+      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        throw new Error('Configuración de correo incompleta');
+      }
+      
       const agentes = await this.getAgentesEmails();
       
       if (agentes.length === 0) {
@@ -44,7 +58,6 @@ class EmailService {
         return { success: true, count: 0 };
       }
 
-      // La URL apunta al listado de inmuebles
       const baseUrl = process.env.APP_URL || 'https://inmobiliriafenix.netlify.app';
       const propertyUrl = `${baseUrl}/inmuebles`;
       
@@ -92,7 +105,6 @@ class EmailService {
               margin: 20px 0;
               text-align: center;
             }
-            /* ESTILOS DEL BOTÓN CON TUS COLORES */
             .button {
               display: inline-block;
               padding: 12px 30px;
@@ -153,14 +165,6 @@ class EmailService {
                   🔍 Ver Listado de Inmuebles
                 </a>
               </div>
-              
-              <p style="font-size: 14px; color: #666; margin-top: 20px;">
-                <strong>¿Qué puedes hacer?</strong><br>
-                • Revisar la documentación del inmueble<br>
-                • Contactar al propietario<br>
-                • Programar visitas<br>
-                • Compartir con clientes interesados
-              </p>
               
               <div class="highlight">
                 <strong>🔗 Enlace directo:</strong><br>
