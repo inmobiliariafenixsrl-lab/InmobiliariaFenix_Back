@@ -11,16 +11,21 @@ class EmailService {
     }
     
     // Configuración mejorada
-   this.transporter = nodemailer.createTransport({
-      host: "142.250.27.108",
-      port: 465,
-      secure: true,
+    this.transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
+      family: 4,
+      connectionTimeout: 30000,
+      greetingTimeout: 30000,
+      socketTimeout: 30000,
+      // Ignorar certificados SSL para pruebas
       tls: {
-        servername: "smtp.gmail.com"
+        rejectUnauthorized: false
       }
     });
   }
