@@ -3,21 +3,23 @@ const { query } = require("../../db");
 
 class EmailService {
   constructor() {
-    // Configuración para Gmail FORZANDO IPv4 (SOLUCIÓN AL ERROR ENETUNREACH)
+    // Configuración para Gmail con puerto 465 (SSL)
     this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.SMTP_PORT) || 587,
-      secure: false, // false para puerto 587
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true, // true para puerto 465
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
-      // FORZAR IPv4 - SOLUCIONA EL ERROR "ENETUNREACH"
-      family: 4,
-      // Timeouts para evitar que se cuelgue
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 10000,
+      family: 4, // Forzar IPv4
+      connectionTimeout: 30000,
+      greetingTimeout: 30000,
+      socketTimeout: 30000,
+      // Deshabilitar TLS para pruebas (opcional)
+      tls: {
+        rejectUnauthorized: false
+      }
     });
   }
 
@@ -44,7 +46,6 @@ class EmailService {
         return { success: true, count: 0 };
       }
 
-      // La URL apunta al listado de inmuebles
       const baseUrl = process.env.APP_URL || 'https://inmobiliriafenix.netlify.app';
       const propertyUrl = `${baseUrl}/inmuebles`;
       
@@ -92,7 +93,6 @@ class EmailService {
               margin: 20px 0;
               text-align: center;
             }
-            /* ESTILOS DEL BOTÓN CON TUS COLORES */
             .button {
               display: inline-block;
               padding: 12px 30px;
