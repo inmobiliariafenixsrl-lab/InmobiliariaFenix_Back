@@ -1,10 +1,24 @@
-const sgMail = require('@sendgrid/mail');
+const nodemailer = require('nodemailer');
 const { query } = require("../../db");
 
 class EmailService {
   constructor() {
-    // Configurar SendGrid con API Key
-    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+    // Configuración para Gmail FORZANDO IPv4 (SOLUCIÓN AL ERROR ENETUNREACH)
+    this.transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT) || 587,
+      secure: false, // false para puerto 587
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+      // FORZAR IPv4 - SOLUCIONA EL ERROR "ENETUNREACH"
+      family: 4,
+      // Timeouts para evitar que se cuelgue
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 10000,
+    });
   }
 
   async getAgentesEmails() {
@@ -30,6 +44,7 @@ class EmailService {
         return { success: true, count: 0 };
       }
 
+      // La URL apunta al listado de inmuebles
       const baseUrl = process.env.APP_URL || 'https://inmobiliriafenix.netlify.app';
       const propertyUrl = `${baseUrl}/inmuebles`;
       
@@ -77,6 +92,7 @@ class EmailService {
               margin: 20px 0;
               text-align: center;
             }
+            /* ESTILOS DEL BOTÓN CON TUS COLORES */
             .button {
               display: inline-block;
               padding: 12px 30px;
@@ -163,60 +179,23 @@ class EmailService {
 
       const emails = agentes.map(a => a.email);
       
-      // Enviar a todos los agentes (SendGrid permite array directamente)
-      const msg = {
-        to: emails,
-        from: process.env.SENDGRID_FROM || 'inmobiliariafenixsrl@gmail.com',
-        subject: subject,
-        html: html,
-      };
-      
-      await sgMail.send(msg);
-      console.log(`✅ Correo enviado exitosamente a ${agentes.length} agentes via SendGrid`);
-      console.log(`📧 Propiedad: ${propertyTitle}`);
-      
-      return { success: true, count: agentes.length };
-      
-    } catch (error) {
-      console.error("❌ Error enviando correo con SendGrid:", error);
-      
-      // Si SendGrid falla, intentar con Gmail como respaldo
-      console.log("Intentando con Gmail como respaldo...");
-      return await this.sendWithGmailFallback(propertyId, propertyTitle, agentes, propertyUrl);
-    }
-  }
-
-  // Método de respaldo con Gmail (por si SendGrid falla)
-  async sendWithGmailFallback(propertyId, propertyTitle, agentes, propertyUrl) {
-    try {
-      const nodemailer = require('nodemailer');
-      
-      const transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-        family: 4,
-        timeout: 15000,
-      });
-
-      const emails = agentes.map(a => a.email);
-      
-      await transporter.sendMail({
+      const mailOptions = {
         from: process.env.SMTP_FROM || '"Inmobiliaria Fenix" <inmobiliariafenixsrl@gmail.com>',
         to: 'inmobiliariafenixsrl@gmail.com',
         bcc: emails.join(', '),
-        subject: `✨ Nuevo inmueble disponible: ${propertyTitle}`,
-        html: `...` // Mismo HTML
-      });
+        subject: subject,
+        html: html
+      };
+
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Correo enviado exitosamente a ${agentes.length} agentes`);
+      console.log(`📧 Propiedad: ${propertyTitle}`);
+      console.log(`👥 Destinatarios: ${emails.join(', ')}`);
       
-      console.log(`✅ Correo enviado con Gmail (respaldo) a ${agentes.length} agentes`);
       return { success: true, count: agentes.length };
+      
     } catch (error) {
-      console.error("❌ Error también con Gmail:", error);
+      console.error("❌ Error enviando correo:", error);
       return { success: false, error: error.message };
     }
   }
