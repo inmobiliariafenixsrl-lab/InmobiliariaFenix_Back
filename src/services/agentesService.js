@@ -112,21 +112,12 @@ const getAgenteById = async (id) => {
         a.telefono as phone,
         a.ci,
         a.direccion as address,
-        a.foto as photo,
         a.especializacion as specialization,
         a.rol as role,
         a.estado,
         a.fecha_creacion as "joinDate",
         a.idgrupo as "groupId",
-        g.nombre as "groupName",
-        COALESCE(
-          (SELECT COUNT(*) FROM Inmueble i WHERE i.idagente = a.idAgente AND i.estado != 'eliminado'),
-          0
-        ) as "propertiesCount",
-        COALESCE(
-          (SELECT ARRAY_AGG(i.idInmueble::text) FROM Inmueble i WHERE i.idagente = a.idAgente AND i.estado != 'eliminado'),
-          ARRAY[]::text[]
-        ) as capturedProperties
+        g.nombre as "groupName"
       FROM Agente a
       LEFT JOIN Grupo g ON a.idgrupo = g.idgrupo
       WHERE a.idAgente = $1 AND a.estado != 'eliminado'`,
@@ -141,12 +132,9 @@ const getAgenteById = async (id) => {
     const date = Date.now()
     return {
       ...agente,
-      photo: agente.photo 
-        ? `/agentes/photo/${agente.id}?t=${date}`
-        : null,
+      photo: `/agentes/photo/${agente.id}?t=${date}`,
       active: agente.estado === 'activo',
       joinDate: agente.joinDate ? new Date(agente.joinDate).toISOString().split('T')[0] : null,
-      capturedProperties: agente.capturedproperties || []
     };
   } catch (error) {
     console.error("Error en getAgenteById:", error);
