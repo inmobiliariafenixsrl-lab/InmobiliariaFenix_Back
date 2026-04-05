@@ -43,46 +43,39 @@ const getAllAgentes = async (user, filters = {}) => {
     
     const offset = (page - 1) * limit;
     
-    const [countResult, result] = await Promise.all([
-      query(
-        `SELECT COUNT(*) as total
-         FROM Agente a
-         ${whereClause}`,
-        queryParams
-      ),
-      query(
-        `SELECT 
-          a.idAgente as id,
-          a.nombre as name,
-          a.apellido as "lastName",
-          a.email,
-          a.telefono as phone,
-          a.ci,
-          a.direccion as address,
-          a.foto as photo,
-          a.especializacion as specialization,
-          a.rol as role,
-          a.estado,
-          a.fecha_creacion as "joinDate",
-          a.idgrupo as "groupId",
-          g.nombre as "groupName",
-          COALESCE(COUNT(i.idInmueble), 0) as "propertiesCount"
-        FROM Agente a
-        LEFT JOIN Grupo g ON a.idgrupo = g.idgrupo
-        LEFT JOIN Inmueble i ON i.idagente = a.idAgente AND i.estado != 'eliminado'
-        ${whereClause}
-        GROUP BY 
-          a.idAgente,
-          g.nombre
-        ORDER BY 
-          CASE WHEN a.estado = 'activo' THEN 0 ELSE 1 END,
-          a.nombre ASC
-        LIMIT $${paramCounter} OFFSET $${paramCounter + 1}`,
-        [...queryParams, limit, offset]
-      )
-    ]);
+    const result = await query(
+      `SELECT
+        a.idAgente as id,
+        a.nombre as name,
+        a.apellido as "lastName",
+        a.email,
+        a.telefono as phone,
+        a.ci,
+        a.direccion as address,
+        a.foto as photo,
+        a.especializacion as specialization,
+        a.rol as role,
+        a.estado,
+        a.fecha_creacion as "joinDate",
+        a.idgrupo as "groupId",
+        g.nombre as "groupName",
+        CASE WHEN a.estado = 'activo' THEN 0 ELSE 1 END as status_order,
+        COALESCE(i.propertiesCount, 0) as "propertiesCount"
+      FROM Agente a
+      LEFT JOIN Grupo g ON a.idgrupo = g.idgrupo
+      LEFT JOIN (
+        SELECT idagente, COUNT(*) as propertiesCount
+        FROM Inmueble
+        WHERE estado != 'eliminado'
+        GROUP BY idagente
+      ) i ON i.idagente = a.idAgente
+      ${whereClause}
+      ORDER BY status_order, a.nombre ASC
+      LIMIT $${paramCounter} OFFSET $${paramCounter + 1}`,
+      [...queryParams, limit, offset]
+    );
     
-    const total = parseInt(countResult.rows[0].total);
+    const total = result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0;
     const totalPages = Math.ceil(total / limit);
     
     const agentes = setPhotoURL(result.rows.map(agente => ({
