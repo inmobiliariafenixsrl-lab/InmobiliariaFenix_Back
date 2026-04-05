@@ -52,7 +52,6 @@ const getAllAgentes = async (user, filters = {}) => {
         a.telefono as phone,
         a.ci,
         a.direccion as address,
-        a.foto as photo,
         a.especializacion as specialization,
         a.rol as role,
         a.estado,
@@ -599,7 +598,6 @@ const getAgentesByGrupo = async (grupoId) => {
         a.idAgente as id,
         a.nombre as name,
         a.apellido as "lastName",
-        a.foto as photo,
         a.especializacion as specialization,
         a.rol as role,
         a.estado
@@ -612,9 +610,7 @@ const getAgentesByGrupo = async (grupoId) => {
     const agentes = result.rows.map(({ estado, ...agente }) => ({
       ...agente,
       active: estado === 'activo',
-      photo: agente.photo 
-        ? `/agentes/photo/${agente.id}?t=${Date.now()}`
-        : null
+      photo: `/agentes/photo/${agente.id}?t=${Date.now()}`
     }));
     
     return agentes;
@@ -647,8 +643,7 @@ const getAllGrupos = async (filters = {}, user) => {
             SELECT json_agg(
               json_build_object(
                 'id', a.idAgente,
-                'name', a.nombre,
-                'photo', a.foto
+                'name', a.nombre
               )
               ORDER BY a.nombre ASC
             )
@@ -933,9 +928,7 @@ const setPhotoURL = (agentes) => {
   const date = Date.now();
   return agentes.map(agente => ({
     ...agente,
-    photo: agente.photo 
-      ? `/agentes/photo/${agente.id}?t=${date}`
-      : null
+    photo: `/agentes/photo/${agente.id}?t=${date}`
   }));
 };
 

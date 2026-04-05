@@ -53,7 +53,6 @@ const authenticate = async (req, res, next) => {
         telefono,
         ci,
         direccion,
-        foto,
         especializacion,
         rol,
         estado,
