@@ -49,5 +49,5 @@ router.post(
   "/rechazar-todos",
   documentManagementController.rejectAllDocuments
 );
-
+router.get("/propiedad/:propertyId", documentManagementController.getPropertyById);
 module.exports = router;
