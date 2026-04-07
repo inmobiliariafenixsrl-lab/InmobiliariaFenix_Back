@@ -85,9 +85,15 @@ class DocumentManagementController {
       const { propertyId, observation } = req.body;
       const reviewerId = req.user.idagente;
       
-      await documentManagementService.approveAllDocuments(propertyId, reviewerId, observation);
+      const result = await documentManagementService.approveAllDocuments(propertyId, reviewerId, observation);
       
-      res.json({ success: true, message: "Todos los documentos aprobados exitosamente" });
+      // Retornar también la URL de Gmail para abrir en el frontend
+      res.json({ 
+        success: true, 
+        message: result.message,
+        emailData: result.emailData,
+        propertyTitle: result.propertyTitle
+      });
     } catch (error) {
       console.error("Error in approveAllDocuments:", error);
       res.status(500).json({ error: error.message });

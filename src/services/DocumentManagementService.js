@@ -212,12 +212,10 @@ class DocumentManagementService {
 
   // Método privado para actualizar o insertar registro en inmueble_revision
   async _upsertPropertyRevision(propertyId, reviewerId) {
-    // Verificar si ya existe un registro para esta propiedad
     const checkSql = `SELECT idinmueble_revision FROM inmueble_revision WHERE idinmueble = $1`;
     const checkResult = await query(checkSql, [propertyId]);
     
     if (checkResult.rows.length > 0) {
-      // Actualizar el registro existente
       const updateSql = `
         UPDATE inmueble_revision 
         SET idagente = $1, fecha_revision = NOW()
@@ -227,7 +225,6 @@ class DocumentManagementService {
       const updateResult = await query(updateSql, [reviewerId, propertyId]);
       return updateResult.rows[0].idinmueble_revision;
     } else {
-      // Insertar nuevo registro
       const insertSql = `
         INSERT INTO inmueble_revision (idagente, idinmueble, fecha_revision)
         VALUES ($1, $2, NOW())
@@ -236,6 +233,73 @@ class DocumentManagementService {
       const insertResult = await query(insertSql, [reviewerId, propertyId]);
       return insertResult.rows[0].idinmueble_revision;
     }
+  }
+
+  // Método para obtener los emails de los agentes
+  async getAgentesEmails() {
+    const sql = `
+      SELECT email, nombre, apellido, idagente
+      FROM agente 
+      WHERE estado = 'activo' 
+      AND rol != 'moderador'
+      AND email IS NOT NULL 
+      AND email != ''
+    `;
+    
+    const result = await query(sql);
+    return result.rows;
+  }
+
+  // Método que genera la URL de Gmail con el mensaje pre-cargado
+  async generateGmailUrl(propertyId, propertyTitle) {
+    const agentes = await this.getAgentesEmails();
+    
+    if (agentes.length === 0) {
+      return null;
+    }
+
+    const baseUrl = process.env.APP_URL || 'https://inmobiliriafenix.netlify.app';
+    const propertyUrl = `${baseUrl}/inmuebles`;
+    
+    // Construir el cuerpo del correo en texto plano (para mailto:)
+    const subject = encodeURIComponent(`✨ Nuevo inmueble disponible: ${propertyTitle}`);
+    
+    const emailBody = `
+Hola,
+
+Tenemos una NUEVA PROPIEDAD que ha sido aprobada y está disponible en el sistema:
+
+"📌 ${propertyTitle}"
+
+✅ Estado: Aprobada y activa
+🏢 Tipo: Inmueble en venta/alquiler
+
+Te invitamos a revisar los detalles de esta propiedad iniciando sesión en el sistema:
+
+🔍 Ver Listado de Inmuebles: ${propertyUrl}
+
+---
+Este es un mensaje automático del sistema de gestión de Inmobiliaria Fenix.
+    `.trim();
+    
+    const body = encodeURIComponent(emailBody);
+    
+    // Obtener todos los emails separados por coma
+    const emails = agentes.map(a => a.email).join(',');
+    
+    // Construir URL mailto: para abrir en Gmail (si el usuario tiene Gmail como predeterminado)
+    // O usar el enlace directo de Gmail
+    const mailtoUrl = `mailto:${emails}?subject=${subject}&body=${body}`;
+    
+    // También generar URL directa de Gmail Web
+    const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(emails)}&su=${subject}&body=${body}`;
+    
+    return {
+      mailtoUrl,
+      gmailComposeUrl,
+      emails: agentes,
+      count: agentes.length
+    };
   }
 
   async approveAllDocuments(propertyId, reviewerId, observation = null) {
@@ -257,20 +321,16 @@ class DocumentManagementService {
         [propertyId]
       );
       
-      // Enviar notificación por correo
-      emailService.sendPropertyApprovedEmail(propertyId, propertyTitle)
-        .then(result => {
-          if (result.success) {
-            console.log(`✅ Notificación enviada a ${result.count} agentes para la propiedad: ${propertyTitle}`);
-          } else {
-            console.log(`⚠️ La propiedad ${propertyTitle} se aprobó pero hubo un problema con el envío de correos: ${result.error}`);
-          }
-        })
-        .catch(error => {
-          console.error(`❌ Error enviando notificación para ${propertyTitle}:`, error.message);
-        });
+      // Generar las URLs para Gmail
+      const emailData = await this.generateGmailUrl(propertyId, propertyTitle);
       
-      return { success: true };
+      // Retornar la información para que el frontend abra Gmail
+      return { 
+        success: true,
+        emailData: emailData,
+        propertyTitle: propertyTitle,
+        message: emailData ? `Correo preparado para ${emailData.count} destinatarios` : 'No hay destinatarios disponibles'
+      };
       
     } catch (error) {
       console.error("Error in approveAllDocuments:", error);
@@ -280,15 +340,12 @@ class DocumentManagementService {
 
   async rejectAllDocuments(propertyId, reviewerId, observation) {
     try {
-      // Validar que la observación no esté vacía
       if (!observation || observation.trim() === "") {
         throw new Error("La observación es requerida para rechazar la propiedad");
       }
       
-      // Actualizar o insertar el registro en inmueble_revision
       await this._upsertPropertyRevision(propertyId, reviewerId);
       
-      // Actualizar el estado de la propiedad a 'observado' y guardar la observación
       await query(
         `UPDATE inmueble SET estado = 'observado', observacion = $1 WHERE idinmueble = $2`,
         [observation, propertyId]
