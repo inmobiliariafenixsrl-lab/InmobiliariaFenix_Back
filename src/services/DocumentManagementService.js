@@ -210,19 +210,40 @@ class DocumentManagementService {
     return historyWithCounts;
   }
 
+  // Método privado para actualizar o insertar registro en inmueble_revision
+  async _upsertPropertyRevision(propertyId, reviewerId) {
+    // Verificar si ya existe un registro para esta propiedad
+    const checkSql = `SELECT idinmueble_revision FROM inmueble_revision WHERE idinmueble = $1`;
+    const checkResult = await query(checkSql, [propertyId]);
+    
+    if (checkResult.rows.length > 0) {
+      // Actualizar el registro existente
+      const updateSql = `
+        UPDATE inmueble_revision 
+        SET idagente = $1, fecha_revision = NOW()
+        WHERE idinmueble = $2
+        RETURNING idinmueble_revision
+      `;
+      const updateResult = await query(updateSql, [reviewerId, propertyId]);
+      return updateResult.rows[0].idinmueble_revision;
+    } else {
+      // Insertar nuevo registro
+      const insertSql = `
+        INSERT INTO inmueble_revision (idagente, idinmueble, fecha_revision)
+        VALUES ($1, $2, NOW())
+        RETURNING idinmueble_revision
+      `;
+      const insertResult = await query(insertSql, [reviewerId, propertyId]);
+      return insertResult.rows[0].idinmueble_revision;
+    }
+  }
+
   async approveAllDocuments(propertyId, reviewerId, observation = null) {
     try {
-      const checkSql = `SELECT idinmueble_revision FROM inmueble_revision WHERE idinmueble = $1`;
-      const checkResult = await query(checkSql, [propertyId]);
+      // Actualizar o insertar el registro en inmueble_revision
+      await this._upsertPropertyRevision(propertyId, reviewerId);
       
-      if (checkResult.rows.length === 0) {
-        await query(
-          `INSERT INTO inmueble_revision (idagente, idinmueble, fecha_revision)
-           VALUES ($1, $2, NOW())`,
-          [reviewerId, propertyId]
-        );
-      }
-      
+      // Obtener el título de la propiedad para el correo
       const propertyResult = await query(
         `SELECT titulo FROM inmueble WHERE idinmueble = $1`,
         [propertyId]
@@ -230,11 +251,13 @@ class DocumentManagementService {
       
       const propertyTitle = propertyResult.rows[0]?.titulo || 'Sin título';
       
+      // Actualizar el estado de la propiedad a 'activo' y limpiar observación
       await query(
         `UPDATE inmueble SET estado = 'activo', observacion = NULL WHERE idinmueble = $1`,
         [propertyId]
       );
       
+      // Enviar notificación por correo
       emailService.sendPropertyApprovedEmail(propertyId, propertyTitle)
         .then(result => {
           if (result.success) {
@@ -257,17 +280,15 @@ class DocumentManagementService {
 
   async rejectAllDocuments(propertyId, reviewerId, observation) {
     try {
-      const checkSql = `SELECT idinmueble_revision FROM inmueble_revision WHERE idinmueble = $1`;
-      const checkResult = await query(checkSql, [propertyId]);
-      
-      if (checkResult.rows.length === 0) {
-        await query(
-          `INSERT INTO inmueble_revision (idagente, idinmueble, fecha_revision)
-           VALUES ($1, $2, NOW())`,
-          [reviewerId, propertyId]
-        );
+      // Validar que la observación no esté vacía
+      if (!observation || observation.trim() === "") {
+        throw new Error("La observación es requerida para rechazar la propiedad");
       }
       
+      // Actualizar o insertar el registro en inmueble_revision
+      await this._upsertPropertyRevision(propertyId, reviewerId);
+      
+      // Actualizar el estado de la propiedad a 'observado' y guardar la observación
       await query(
         `UPDATE inmueble SET estado = 'observado', observacion = $1 WHERE idinmueble = $2`,
         [observation, propertyId]
