@@ -18,9 +18,15 @@ const getAllAgentes = async (user, filters = {}) => {
     whereConditions.push(`a.estado != 'eliminado'`);
     
     if (user.rol === 'team_leader') {
-      whereConditions.push(`a.idgrupo = $${paramCounter}`);
-      queryParams.push(user.idgrupo);
-      paramCounter++;
+      if (searchTerm && searchTerm.trim()) {
+        whereConditions.push(`(a.idgrupo IS NULL OR a.idgrupo = $${paramCounter}) AND a.rol = 'agente'`);
+        queryParams.push(user.idgrupo);
+        paramCounter++;
+      } else {
+        whereConditions.push(`a.idgrupo = $${paramCounter}`);
+        queryParams.push(user.idgrupo);
+        paramCounter++;
+      }
     }
     
     if (searchTerm && searchTerm.trim()) {
@@ -292,8 +298,8 @@ const updateAgente = async (id, agenteData, user) => {
     }
 
     const agenteActual = currentAgente.rows[0];
-
-    if (user.rol === 'team_leader' && agenteActual.idgrupo !== user.idgrupo) {
+    
+    if (user.rol === 'team_leader' && agenteActual.idgrupo !== null && agenteActual.idgrupo !== user.idgrupo) {
       return null;
     }
 
