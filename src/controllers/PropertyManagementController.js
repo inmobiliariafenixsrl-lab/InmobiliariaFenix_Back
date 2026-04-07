@@ -263,6 +263,17 @@ const deleteDocument = async (req, res) => {
   }
 };
 
+const getPropertiesByTeam = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const properties = await propertyManagementService.getPropertiesByTeam(groupId);
+    res.status(200).json(properties);
+  } catch (error) {
+    console.error("Error in getPropertiesByTeam:", error);
+    res.status(500).json({ error: "Error al obtener los inmuebles del equipo" });
+  }
+};
+
 module.exports = {
   getAllProperties,
   getPropertiesByAgent,
@@ -275,4 +286,5 @@ module.exports = {
   uploadDocument,
   getDocumentFile,
   deleteDocument,
+  getPropertiesByTeam,
 };

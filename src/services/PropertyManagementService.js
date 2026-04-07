@@ -530,6 +530,43 @@ const deleteDocument = async (documentId) => {
   }
 };
 
+const getPropertiesByTeam = async (groupId) => {
+  try {
+    // Obtener todos los agentes del grupo
+    const agentsResult = await query(
+      `SELECT idagente FROM Agente WHERE idgrupo = $1 AND estado = 'activo'`,
+      [groupId]
+    );
+    
+    const agentIds = agentsResult.rows.map(a => a.idagente);
+    
+    if (agentIds.length === 0) {
+      return [];
+    }
+    
+    // Construir la consulta con los IDs de agentes
+    const placeholders = agentIds.map((_, i) => `$${i + 1}`).join(', ');
+    
+    const result = await query(
+      `SELECT i.*, 
+              a.nombre as agente_nombre, 
+              a.apellido as agente_apellido
+       FROM Inmueble i
+       LEFT JOIN Agente a ON i.idagente = a.idagente
+       WHERE i.idagente IN (${placeholders}) 
+         AND i.estado NOT IN ('eliminado') 
+       ORDER BY i.fecha_creacion DESC`,
+      agentIds
+    );
+    
+    return result.rows;
+  } catch (error) {
+    console.error("Error in getPropertiesByTeam:", error);
+    throw error;
+  }
+};
+
+
 // Agregar al module.exports
 module.exports = {
   getAllProperties,
@@ -544,4 +581,5 @@ module.exports = {
   uploadDocument,
   getDocumentFile,
   deleteDocument,
+  getPropertiesByTeam,
 };

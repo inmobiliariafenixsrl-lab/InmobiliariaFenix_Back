@@ -6,6 +6,7 @@ const upload = require("../middleware/upload");
 // Rutas para gestión de inmuebles
 router.get("/properties", propertyManagementController.getAllProperties);
 router.get("/properties/agent/:agentId", propertyManagementController.getPropertiesByAgent);
+router.get("/properties/team/:groupId", propertyManagementController.getPropertiesByTeam);
 router.get("/properties/:id", propertyManagementController.getPropertyById);
 router.post("/properties/save-progress", propertyManagementController.savePropertyProgress);
 router.put("/properties/:id", propertyManagementController.updateProperty);
