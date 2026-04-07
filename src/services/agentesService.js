@@ -43,7 +43,14 @@ const getAllAgentes = async (user, filters = {}) => {
     
     const offset = (page - 1) * limit;
     
-    const result = await query(
+    const [countResult, result] = await Promise.all([
+      query(
+        `SELECT COUNT(*) as total
+         FROM Agente a
+         ${whereClause}`,
+        queryParams
+      ),
+      query(
       `SELECT
         a.idAgente as id,
         a.nombre as name,
@@ -72,9 +79,10 @@ const getAllAgentes = async (user, filters = {}) => {
       ORDER BY status_order, a.nombre ASC
       LIMIT $${paramCounter} OFFSET $${paramCounter + 1}`,
       [...queryParams, limit, offset]
-    );
+    )
+    ])
     
-    const total = result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0;
+    const total = parseInt(countResult.rows[0].total);
     const totalPages = Math.ceil(total / limit);
     
     const agentes = setPhotoURL(result.rows.map(agente => ({
