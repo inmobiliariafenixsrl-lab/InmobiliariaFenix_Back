@@ -563,6 +563,7 @@ const getAllActiveAgentes = async () => {
               especializacion, rol, estado, idgrupo
        FROM Agente 
        WHERE estado = 'activo' 
+         AND rol != 'moderador'
        ORDER BY nombre, apellido`
     );
     return result.rows;
