@@ -19,4 +19,9 @@ router.post("/properties/:id/documents", upload.single("pdf"), propertyManagemen
 router.get("/documents/:id/file", propertyManagementController.getDocumentFile);
 router.delete("/documents/:id", propertyManagementController.deleteDocument);
 
+// NUEVAS RUTAS PARA OBTENER AGENTES SEGÚN ROL
+router.get("/agentes/all-active", propertyManagementController.getAllActiveAgentes);
+router.get("/agentes/by-group/:groupId", propertyManagementController.getAgentesByGroup);
+router.get("/agentes/:id", propertyManagementController.getAgenteById);
+
 module.exports = router;

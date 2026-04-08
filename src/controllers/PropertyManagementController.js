@@ -184,8 +184,6 @@ const getPropertyDocuments = async (req, res) => {
   }
 };
 
-// ========== NUEVAS FUNCIONES PARA DOCUMENTOS ==========
-
 const uploadDocument = async (req, res) => {
   try {
     const { id } = req.params;
@@ -216,8 +214,8 @@ const uploadDocument = async (req, res) => {
 
 const getDocumentFile = async (req, res) => {
   try {
-    const { id } = req.params; // Esto captura el ID de la URL
-    console.log("Buscando documento con ID:", id); // Agrega este log para verificar
+    const { id } = req.params;
+    console.log("Buscando documento con ID:", id);
     
     const document = await propertyManagementService.getDocumentFile(id);
     
@@ -227,13 +225,11 @@ const getDocumentFile = async (req, res) => {
 
     let pdfBuffer = document.pdf;
     
-    // Si es un string que comienza con \x, convertirlo a buffer
     if (typeof pdfBuffer === 'string' && pdfBuffer.startsWith('\\x')) {
       const hexString = pdfBuffer.substring(2);
       pdfBuffer = Buffer.from(hexString, 'hex');
     }
     
-    // Si es un objeto con type y data (formato de bytea de PostgreSQL)
     if (pdfBuffer && typeof pdfBuffer === 'object' && pdfBuffer.type === 'Buffer' && Array.isArray(pdfBuffer.data)) {
       pdfBuffer = Buffer.from(pdfBuffer.data);
     }
@@ -274,6 +270,42 @@ const getPropertiesByTeam = async (req, res) => {
   }
 };
 
+// NUEVAS FUNCIONES PARA OBTENER AGENTES
+const getAllActiveAgentes = async (req, res) => {
+  try {
+    const agentes = await propertyManagementService.getAllActiveAgentes();
+    res.status(200).json(agentes);
+  } catch (error) {
+    console.error("Error in getAllActiveAgentes:", error);
+    res.status(500).json({ error: "Error al obtener los agentes" });
+  }
+};
+
+const getAgentesByGroup = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const agentes = await propertyManagementService.getAgentesByGroup(groupId);
+    res.status(200).json(agentes);
+  } catch (error) {
+    console.error("Error in getAgentesByGroup:", error);
+    res.status(500).json({ error: "Error al obtener los agentes del grupo" });
+  }
+};
+
+const getAgenteById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const agente = await propertyManagementService.getAgenteById(id);
+    if (!agente) {
+      return res.status(404).json({ error: "Agente no encontrado" });
+    }
+    res.status(200).json([agente]);
+  } catch (error) {
+    console.error("Error in getAgenteById:", error);
+    res.status(500).json({ error: "Error al obtener el agente" });
+  }
+};
+
 module.exports = {
   getAllProperties,
   getPropertiesByAgent,
@@ -287,4 +319,7 @@ module.exports = {
   getDocumentFile,
   deleteDocument,
   getPropertiesByTeam,
+  getAllActiveAgentes,
+  getAgentesByGroup,
+  getAgenteById,
 };

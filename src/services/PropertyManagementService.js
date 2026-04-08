@@ -83,7 +83,6 @@ const validateStatus = (estado) => {
   return finalEstado;
 };
 
-// Función para guardar documentos
 const saveDocuments = async (propertyId, documents, tipoCambioCaptacion) => {
   try {
     const tiposResult = await query(
@@ -109,17 +108,14 @@ const saveDocuments = async (propertyId, documents, tipoCambioCaptacion) => {
         const tipoId = tiposMap[tipoNombre];
 
         if (tipoId) {
-          // Eliminar documentos existentes de este tipo
           await query(
             `DELETE FROM Documento WHERE idinmueble = $1 AND idtipo_documento = $2`,
             [propertyId, tipoId],
           );
 
-          // Insertar nuevos documentos
           for (const fileInfo of files) {
-            // Si el documento tiene ID, significa que ya existe y no debemos reinsertarlo
             if (fileInfo.id) {
-              continue; // Saltar documentos existentes
+              continue;
             }
 
             const fileMetadata = JSON.stringify({
@@ -145,7 +141,6 @@ const saveDocuments = async (propertyId, documents, tipoCambioCaptacion) => {
   }
 };
 
-// Funciones principales
 const getAllProperties = async () => {
   try {
     const result = await query(
@@ -185,7 +180,6 @@ const getPropertiesByAgent = async (agentId) => {
 
 const getPropertyDocuments = async (propertyId) => {
   try {
-    // CORREGIDO: Usar idinmueble
     const result = await query(
       `SELECT d.*, dt.nombre as tipo_nombre 
        FROM Documento d
@@ -487,7 +481,6 @@ const deleteProperty = async (id) => {
 
 const uploadDocument = async (propertyId, documentTypeId, pdfBuffer, fileName) => {
   try {
-    // CORREGIDO: Usar idinmueble (sin mayúsculas) y iddocumento
     const result = await query(
       `INSERT INTO Documento (idinmueble, pdf, idtipo_documento, nombre_archivo) 
        VALUES ($1, $2, $3, $4) RETURNING iddocumento`,
@@ -502,7 +495,6 @@ const uploadDocument = async (propertyId, documentTypeId, pdfBuffer, fileName) =
 
 const getDocumentFile = async (documentId) => {
   try {
-    // CORREGIDO: Usar "iddocumento" (con 'n')
     const result = await query(
       `SELECT iddocumento, pdf, nombre_archivo, idtipo_documento 
        FROM Documento 
@@ -518,7 +510,6 @@ const getDocumentFile = async (documentId) => {
 
 const deleteDocument = async (documentId) => {
   try {
-    // CORREGIDO: Usar iddocumento
     const result = await query(
       `DELETE FROM Documento WHERE iddocumento = $1 RETURNING *`,
       [documentId]
@@ -532,7 +523,6 @@ const deleteDocument = async (documentId) => {
 
 const getPropertiesByTeam = async (groupId) => {
   try {
-    // Obtener todos los agentes del grupo
     const agentsResult = await query(
       `SELECT idagente FROM Agente WHERE idgrupo = $1 AND estado = 'activo'`,
       [groupId]
@@ -544,7 +534,6 @@ const getPropertiesByTeam = async (groupId) => {
       return [];
     }
     
-    // Construir la consulta con los IDs de agentes
     const placeholders = agentIds.map((_, i) => `$${i + 1}`).join(', ');
     
     const result = await query(
@@ -566,8 +555,56 @@ const getPropertiesByTeam = async (groupId) => {
   }
 };
 
+// NUEVAS FUNCIONES PARA OBTENER AGENTES
+const getAllActiveAgentes = async () => {
+  try {
+    const result = await query(
+      `SELECT idagente, nombre, apellido, email, telefono, ci, direccion, 
+              especializacion, rol, estado, idgrupo
+       FROM Agente 
+       WHERE estado = 'activo' 
+       ORDER BY nombre, apellido`
+    );
+    return result.rows;
+  } catch (error) {
+    console.error("Error in getAllActiveAgentes:", error);
+    throw error;
+  }
+};
 
-// Agregar al module.exports
+const getAgentesByGroup = async (groupId) => {
+  try {
+    const result = await query(
+      `SELECT idagente, nombre, apellido, email, telefono, ci, direccion, 
+              especializacion, rol, estado, idgrupo
+       FROM Agente 
+       WHERE idgrupo = $1 AND estado = 'activo'
+       ORDER BY nombre, apellido`,
+      [groupId]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error("Error in getAgentesByGroup:", error);
+    throw error;
+  }
+};
+
+const getAgenteById = async (id) => {
+  try {
+    const result = await query(
+      `SELECT idagente, nombre, apellido, email, telefono, ci, direccion, 
+              especializacion, rol, estado, idgrupo
+       FROM Agente 
+       WHERE idagente = $1 AND estado = 'activo'`,
+      [id]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error("Error in getAgenteById:", error);
+    throw error;
+  }
+};
+
 module.exports = {
   getAllProperties,
   getPropertiesByAgent,
@@ -582,4 +619,7 @@ module.exports = {
   getDocumentFile,
   deleteDocument,
   getPropertiesByTeam,
+  getAllActiveAgentes,
+  getAgentesByGroup,
+  getAgenteById,
 };
