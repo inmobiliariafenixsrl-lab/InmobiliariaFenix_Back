@@ -56,6 +56,9 @@ app.use("/api/inmuebles", propertyManagementRoutes);
 const agentesRoutes = require("./src/routes/agentesRoutes");
 app.use("/api/agentes", agentesRoutes);
 
+const sidebarRoutes = require("./src/routes/sidebarRoutes");
+app.use("/api/agentes", sidebarRoutes);
+
 // Manejador de errores global
 app.use((err, req, res, next) => {
   console.error(err.stack);
