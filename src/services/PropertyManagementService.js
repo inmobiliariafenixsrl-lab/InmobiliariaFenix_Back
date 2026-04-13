@@ -83,6 +83,32 @@ const validateStatus = (estado) => {
   return finalEstado;
 };
 
+// ✅ CORREGIDO: Función para validar año de construcción - permite NULL
+const validateYearBuilt = (year) => {
+  // Si es null, undefined, o string vacío, retornar null
+  if (year === null || year === undefined || year === "") {
+    return null;
+  }
+  
+  // Convertir a número
+  const numYear = Number(year);
+  
+  // Si no es un número válido, retornar null
+  if (isNaN(numYear)) {
+    return null;
+  }
+  
+  // Validar rango: entre 1900 y año actual + 5
+  const currentYear = new Date().getFullYear();
+  if (numYear >= 1900 && numYear <= currentYear + 5) {
+    return numYear;
+  }
+  
+  // Si está fuera de rango, retornar null en lugar de forzar año actual
+  console.warn(`Año ${numYear} fuera de rango válido (1900-${currentYear + 5}), guardando como NULL`);
+  return null;
+};
+
 const saveDocuments = async (propertyId, documents, tipoCambioCaptacion) => {
   try {
     const tiposResult = await query(
@@ -218,6 +244,7 @@ const getPropertyById = async (id) => {
   }
 };
 
+// ✅ CORREGIDO: savePropertyProgress - ya no fuerza año actual
 const savePropertyProgress = async (propertyData, documents = null) => {
   const {
     titulo,
@@ -251,18 +278,12 @@ const savePropertyProgress = async (propertyData, documents = null) => {
   const validatedCondicion = validateCondition(condicion);
   const validatedOperacion = validateOperation(operacion);
   const validatedEstado = validateStatus(estado);
+  
+  // ✅ Usar la nueva función de validación que permite NULL
+  const validYear = validateYearBuilt(año_construccion);
 
   if (!idagente) {
     throw new Error("El ID del agente es obligatorio");
-  }
-
-  let validYear = año_construccion;
-  if (
-    !validYear ||
-    validYear < 1900 ||
-    validYear > new Date().getFullYear() + 5
-  ) {
-    validYear = new Date().getFullYear();
   }
 
   const validLatitud =
@@ -302,7 +323,7 @@ const savePropertyProgress = async (propertyData, documents = null) => {
         garaje || false,
         terraza || false,
         piscina || false,
-        validYear,
+        validYear, // ✅ Puede ser NULL
         validLatitud,
         validLongitud,
         idagente,
@@ -324,6 +345,7 @@ const savePropertyProgress = async (propertyData, documents = null) => {
   }
 };
 
+// ✅ CORREGIDO: updateProperty - ya no fuerza año actual
 const updateProperty = async (id, propertyData, documents = null) => {
   const {
     titulo,
@@ -356,15 +378,9 @@ const updateProperty = async (id, propertyData, documents = null) => {
   const validatedCondicion = validateCondition(condicion);
   const validatedOperacion = validateOperation(operacion);
   const validatedEstado = validateStatus(estado);
-
-  let validYear = año_construccion;
-  if (
-    !validYear ||
-    validYear < 1900 ||
-    validYear > new Date().getFullYear() + 5
-  ) {
-    validYear = new Date().getFullYear();
-  }
+  
+  // ✅ Usar la nueva función de validación que permite NULL
+  const validYear = validateYearBuilt(año_construccion);
 
   const validLatitud =
     latitud && !isNaN(parseFloat(latitud)) ? parseFloat(latitud) : -17.3895;
@@ -421,7 +437,7 @@ const updateProperty = async (id, propertyData, documents = null) => {
         garaje || false,
         terraza || false,
         piscina || false,
-        validYear,
+        validYear, // ✅ Puede ser NULL
         validLatitud,
         validLongitud,
         validatedEstado,
@@ -555,7 +571,6 @@ const getPropertiesByTeam = async (groupId) => {
   }
 };
 
-// NUEVAS FUNCIONES PARA OBTENER AGENTES
 const getAllActiveAgentes = async () => {
   try {
     const result = await query(

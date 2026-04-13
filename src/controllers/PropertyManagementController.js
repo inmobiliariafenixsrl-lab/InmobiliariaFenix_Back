@@ -35,6 +35,7 @@ const getPropertyById = async (req, res) => {
   }
 };
 
+// ✅ CORREGIDO: savePropertyProgress - ya no fuerza año actual
 const savePropertyProgress = async (req, res) => {
   try {
     console.log("=== savePropertyProgress recibido ===");
@@ -71,9 +72,10 @@ const savePropertyProgress = async (req, res) => {
 
     propertyData.estado = "en proceso";
 
-    if (!propertyData.año_construccion || propertyData.año_construccion < 1900 || propertyData.año_construccion > new Date().getFullYear() + 5) {
-      console.log("Warning: Año de construcción inválido, usando año actual");
-      propertyData.año_construccion = new Date().getFullYear();
+    // ✅ CORREGIDO: No forzar año actual, dejar que la función validateYearBuilt maneje NULL
+    // Solo logueamos si el año es inválido
+    if (propertyData.año_construccion && (propertyData.año_construccion < 1900 || propertyData.año_construccion > new Date().getFullYear() + 5)) {
+      console.log("Warning: Año de construcción fuera de rango, se guardará como NULL");
     }
 
     if (propertyData.latitud === undefined || propertyData.longitud === undefined || isNaN(propertyData.latitud) || isNaN(propertyData.longitud)) {
@@ -96,6 +98,7 @@ const savePropertyProgress = async (req, res) => {
   }
 };
 
+// ✅ CORREGIDO: updateProperty - ya no fuerza año actual
 const updateProperty = async (req, res) => {
   try {
     const { id } = req.params;
@@ -108,9 +111,9 @@ const updateProperty = async (req, res) => {
     delete propertyData.videoUrl;
     delete propertyData.images;
 
-    if (!propertyData.año_construccion || propertyData.año_construccion < 1900 || propertyData.año_construccion > new Date().getFullYear() + 5) {
-      console.log("Warning: Año de construcción inválido, usando año actual");
-      propertyData.año_construccion = new Date().getFullYear();
+    // ✅ CORREGIDO: No forzar año actual, dejar que la función validateYearBuilt maneje NULL
+    if (propertyData.año_construccion && (propertyData.año_construccion < 1900 || propertyData.año_construccion > new Date().getFullYear() + 5)) {
+      console.log("Warning: Año de construcción fuera de rango, se guardará como NULL");
     }
 
     if (propertyData.latitud === undefined || propertyData.longitud === undefined || isNaN(propertyData.latitud) || isNaN(propertyData.longitud)) {
@@ -270,7 +273,6 @@ const getPropertiesByTeam = async (req, res) => {
   }
 };
 
-// NUEVAS FUNCIONES PARA OBTENER AGENTES
 const getAllActiveAgentes = async (req, res) => {
   try {
     const agentes = await propertyManagementService.getAllActiveAgentes();
