@@ -131,7 +131,12 @@ const getAgenteById = async (id) => {
         a.estado,
         a.fecha_creacion as "joinDate",
         a.idgrupo as "groupId",
-        g.nombre as "groupName"
+        g.nombre as "groupName",
+        a.facebook,
+        a.instagram,
+        a.tiktok,
+        a.youtube,
+        a.porcentajeComision as "porcentajeComision"
       FROM Agente a
       LEFT JOIN Grupo g ON a.idgrupo = g.idgrupo
       WHERE a.idAgente = $1 AND a.estado != 'eliminado'`,
@@ -169,7 +174,12 @@ const createAgente = async (agenteData, user) => {
       specialization,
       role,
       groupId,
-      password
+      password,
+      facebook,
+      instagram,
+      tiktok,
+      youtube,
+      porcentajeComision
     } = agenteData;
     
     if(user.rol === 'team_leader'){
@@ -221,8 +231,9 @@ const createAgente = async (agenteData, user) => {
     const result = await query(
       `INSERT INTO Agente (
         nombre, apellido, email, telefono, ci, direccion, 
-        foto, especializacion, rol, estado, idgrupo, contrasenia
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        foto, especializacion, rol, estado, idgrupo, contrasenia,
+        facebook, instagram, tiktok, youtube, porcentajecomision
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
       RETURNING 
         idAgente as id,
         nombre as name,
@@ -240,7 +251,9 @@ const createAgente = async (agenteData, user) => {
       [
         name, lastName, email, phone, ci, address,
         photo ? Buffer.from(photo.split(',')[1], 'base64') : null,
-        specialization, role, estado, groupId || null, hashedPassword
+        specialization, role, estado, groupId || null, hashedPassword,
+        facebook ? facebook : null, instagram ? instagram : null, tiktok ? tiktok : null,
+        youtube ? youtube : null, porcentajeComision ? porcentajeComision : 1
       ]
     );
     
@@ -284,7 +297,12 @@ const updateAgente = async (id, agenteData, user) => {
       specialization,
       role,
       groupId: groupIdRaw,
-      active
+      active,
+      facebook,
+      instagram,
+      tiktok,
+      youtube,
+      porcentajeComision
     } = agenteData;
     const groupId = groupIdRaw ? Number(groupIdRaw) : null;
 
@@ -433,6 +451,31 @@ const updateAgente = async (id, agenteData, user) => {
       const estado = active === false ? 'inactivo' : 'activo';
       updates.push(`estado = $${paramIndex++}`);
       values.push(estado);
+    }
+
+    if (facebook !== undefined) {
+      updates.push(`facebook = $${paramIndex++}`);
+      values.push(facebook);
+    }
+
+    if  (instagram !== undefined) {
+      updates.push(`instagram = $${paramIndex++}`);
+      values.push(instagram);
+    }
+
+    if  (tiktok !== undefined) {
+      updates.push(`tiktok = $${paramIndex++}`);
+      values.push(tiktok);
+    }
+
+    if  (youtube !== undefined) {
+      updates.push(`youtube = $${paramIndex++}`);
+      values.push(youtube);
+    }
+
+    if  (porcentajeComision !== undefined) {
+      updates.push(`porcentajecomision = $${paramIndex++}`);
+      values.push(porcentajeComision);
     }
     
     if (updates.length === 0) {
