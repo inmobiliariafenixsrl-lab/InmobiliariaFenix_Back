@@ -244,7 +244,6 @@ const getPropertyById = async (id) => {
   }
 };
 
-// ✅ CORREGIDO: savePropertyProgress - ya no fuerza año actual
 const savePropertyProgress = async (propertyData, documents = null) => {
   const {
     titulo,
@@ -272,6 +271,11 @@ const savePropertyProgress = async (propertyData, documents = null) => {
     longitud,
     idagente,
     estado,
+    observacion,
+    enlace_video,
+    idmunicipio,
+    nombre_propietario,
+    celular_propietario,
   } = propertyData;
 
   const validatedTipoPropiedad = validatePropertyType(tipo_propiedad);
@@ -279,7 +283,6 @@ const savePropertyProgress = async (propertyData, documents = null) => {
   const validatedOperacion = validateOperation(operacion);
   const validatedEstado = validateStatus(estado);
   
-  // ✅ Usar la nueva función de validación que permite NULL
   const validYear = validateYearBuilt(año_construccion);
 
   if (!idagente) {
@@ -299,8 +302,10 @@ const savePropertyProgress = async (propertyData, documents = null) => {
         nro_baños, nro_estacionamiento, tipo_cambio_captacion,
         precio_capatacion_m, precio_capatacion_s, precio_captacion_i,
         ascensor, garaje, terraza, piscina, año_construccion,
-        latitud, longitud, idagente, estado, fecha_creacion
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, TIMEZONE('America/La_Paz', NOW()))
+        latitud, longitud, idagente, estado, observacion,
+        enlace_video, idmunicipio, nombre_propietario, celular_propietario,
+        fecha_creacion
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, TIMEZONE('America/La_Paz', NOW()))
       RETURNING *`,
       [
         titulo || "",
@@ -323,11 +328,16 @@ const savePropertyProgress = async (propertyData, documents = null) => {
         garaje || false,
         terraza || false,
         piscina || false,
-        validYear, // ✅ Puede ser NULL
+        validYear,
         validLatitud,
         validLongitud,
         idagente,
         validatedEstado,
+        observacion || null,
+        enlace_video || null,
+        idmunicipio || null,
+        nombre_propietario || null,
+        celular_propietario || null,
       ],
     );
 
@@ -345,7 +355,6 @@ const savePropertyProgress = async (propertyData, documents = null) => {
   }
 };
 
-// ✅ CORREGIDO: updateProperty - ya no fuerza año actual
 const updateProperty = async (id, propertyData, documents = null) => {
   const {
     titulo,
@@ -372,6 +381,11 @@ const updateProperty = async (id, propertyData, documents = null) => {
     latitud,
     longitud,
     estado,
+    observacion,
+    enlace_video,
+    idmunicipio,
+    nombre_propietario,
+    celular_propietario,
   } = propertyData;
 
   const validatedTipoPropiedad = validatePropertyType(tipo_propiedad);
@@ -379,7 +393,6 @@ const updateProperty = async (id, propertyData, documents = null) => {
   const validatedOperacion = validateOperation(operacion);
   const validatedEstado = validateStatus(estado);
   
-  // ✅ Usar la nueva función de validación que permite NULL
   const validYear = validateYearBuilt(año_construccion);
 
   const validLatitud =
@@ -413,8 +426,13 @@ const updateProperty = async (id, propertyData, documents = null) => {
         año_construccion = $21,
         latitud = $22,
         longitud = $23,
-        estado = $24
-      WHERE idinmueble = $25
+        estado = $24,
+        observacion = $25,
+        enlace_video = $26,
+        idmunicipio = $27,
+        nombre_propietario = $28,
+        celular_propietario = $29
+      WHERE idinmueble = $30
       RETURNING *`,
       [
         titulo || "",
@@ -437,10 +455,15 @@ const updateProperty = async (id, propertyData, documents = null) => {
         garaje || false,
         terraza || false,
         piscina || false,
-        validYear, // ✅ Puede ser NULL
+        validYear,
         validLatitud,
         validLongitud,
         validatedEstado,
+        observacion || null,
+        enlace_video || null,
+        idmunicipio || null,
+        nombre_propietario || null,
+        celular_propietario || null,
         id,
       ],
     );
