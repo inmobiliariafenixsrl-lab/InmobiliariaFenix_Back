@@ -6,9 +6,7 @@ const { authenticate } = require('../middleware/loginmiddleware');
 
 router.use(authenticate);
 
-router.get('/departments', propertyManagementController.getDepartments);
-router.get('/departments/:departmentId/provinces', propertyManagementController.getProvincesByDepartment);
-router.get('/provinces/:provinceId/municipalities', propertyManagementController.getMunicipalitiesByProvince);
+router.get('/departments', propertyManagementController.getUbications);
 
 // Rutas para gestión de inmuebles
 router.get("/", propertyManagementController.getAllProperties);

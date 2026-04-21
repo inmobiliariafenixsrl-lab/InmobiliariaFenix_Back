@@ -308,58 +308,16 @@ const getAgenteById = async (req, res) => {
   }
 };
 
-const getDepartments = async (req, res, next) => {
+const getUbications = async (req, res, next) => {
   try {
-    const departments = await propertyManagementService.getAllDepartments();
+    const departments = await propertyManagementService.getAllUbications();
     
     res.status(200).json({
       success: true,
       data: departments,
-      message: 'Departamentos obtenidos exitosamente'
+      message: 'Ubicaciones obtenidos exitosamente'
     });
   } catch (error) {
-    next(error);
-  }
-}
-
-const getProvincesByDepartment = async (req, res, next) => {
-  try {
-    const { departmentId } = req.params;
-    const provinces = await propertyManagementService.getProvincesByDepartment(parseInt(departmentId));
-    
-    res.status(200).json({
-      success: true,
-      data: provinces,
-      message: 'Provincias obtenidas exitosamente'
-    });
-  } catch (error) {
-    if (error.message === 'Departamento no encontrado') {
-      return res.status(404).json({
-        success: false,
-        message: error.message
-      });
-    }
-    next(error);
-  }
-}
-
-const getMunicipalitiesByProvince = async (req, res, next) => {
-  try {
-    const { provinceId } = req.params;
-    const municipalities = await propertyManagementService.getMunicipalitiesByProvince(parseInt(provinceId));
-    
-    res.status(200).json({
-      success: true,
-      data: municipalities,
-      message: 'Municipios obtenidos exitosamente'
-    });
-  } catch (error) {
-    if (error.message === 'Provincia no encontrada') {
-      return res.status(404).json({
-        success: false,
-        message: error.message
-      });
-    }
     next(error);
   }
 }
@@ -380,7 +338,5 @@ module.exports = {
   getAllActiveAgentes,
   getAgentesByGroup,
   getAgenteById,
-  getDepartments,
-  getProvincesByDepartment,
-  getMunicipalitiesByProvince,
+  getUbications,
 };
