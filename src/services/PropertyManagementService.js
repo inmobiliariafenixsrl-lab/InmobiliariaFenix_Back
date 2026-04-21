@@ -207,10 +207,15 @@ const getPropertiesByAgent = async (agentId) => {
 const getPropertyDocuments = async (propertyId) => {
   try {
     const result = await query(
-      `SELECT d.*, dt.nombre as tipo_nombre 
-       FROM Documento d
-       JOIN documento_tipo dt ON d.idtipo_documento = dt.idtipo_documento
-       WHERE d.idinmueble = $1`,
+      `SELECT 
+        d.idDocumento,
+        d.idInmueble,
+        d.idtipo_documento,
+        d.nombre_archivo,
+        dt.nombre as tipo_nombre 
+      FROM Documento d
+      JOIN documento_tipo dt ON d.idtipo_documento = dt.idtipo_documento
+      WHERE d.idinmueble = $1`,
       [propertyId]
     );
     return result.rows;
