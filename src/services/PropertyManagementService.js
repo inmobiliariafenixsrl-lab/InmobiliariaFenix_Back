@@ -644,6 +644,90 @@ const getAgenteById = async (id) => {
   }
 };
 
+const getAllDepartments = async () => {
+  try {
+    const result = await query(
+      `SELECT iddepartamento as id, nombre 
+        FROM departamento 
+        ORDER BY nombre ASC`
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error in getAllDepartments:', error);
+    throw new Error('Error al obtener los departamentos');
+  }
+}
+
+const getProvincesByDepartment = async (departmentId) => {
+  try {
+    if (!departmentId || isNaN(departmentId)) {
+      throw new Error('ID de departamento inválido');
+    }
+
+    const result = await query(
+      `SELECT p.idprovincia as id, 
+              p.nombre, 
+              p.iddepartamento as department_id
+        FROM provincia p
+        WHERE p.iddepartamento = $1
+        ORDER BY p.nombre ASC`,
+      [departmentId]
+    );
+
+    if (result.rows.length === 0) {
+      const deptCheck = await query(
+        'SELECT iddepartamento FROM departamento WHERE iddepartamento = $1',
+        [departmentId]
+      );
+      
+      if (deptCheck.rows.length === 0) {
+        throw new Error('Departamento no encontrado');
+      }
+    }
+
+    return result.rows;
+  } catch (error) {
+    console.error('Error in getProvincesByDepartment:', error);
+    throw error;
+  }
+}
+
+const getMunicipalitiesByProvince= async (provinceId) => {
+  try {
+    if (!provinceId || isNaN(provinceId)) {
+      throw new Error('ID de provincia inválido');
+    }
+
+    const result = await query(
+      `SELECT m.idmunicipio as id, 
+              m.nombre, 
+              m.latitud, 
+              m.longitud, 
+              m.idprovincia as province_id
+        FROM municipio m
+        WHERE m.idprovincia = $1
+        ORDER BY m.nombre ASC`,
+      [provinceId]
+    );
+
+    if (result.rows.length === 0) {
+      const provinceCheck = await query(
+        'SELECT idprovincia FROM provincia WHERE idprovincia = $1',
+        [provinceId]
+      );
+      
+      if (provinceCheck.rows.length === 0) {
+        throw new Error('Provincia no encontrada');
+      }
+    }
+
+    return result.rows;
+  } catch (error) {
+    console.error('Error in getMunicipalitiesByProvince:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   getAllProperties,
   getPropertiesByAgent,
@@ -661,4 +745,7 @@ module.exports = {
   getAllActiveAgentes,
   getAgentesByGroup,
   getAgenteById,
+  getAllDepartments,
+  getProvincesByDepartment,
+  getMunicipalitiesByProvince,
 };

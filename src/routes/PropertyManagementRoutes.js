@@ -2,6 +2,13 @@ const express = require("express");
 const router = express.Router();
 const propertyManagementController = require("../controllers/PropertyManagementController");
 const upload = require("../middleware/upload");
+const { authenticate } = require('../middleware/loginmiddleware');
+
+router.use(authenticate);
+
+router.get('/departments', propertyManagementController.getDepartments);
+router.get('/departments/:departmentId/provinces', propertyManagementController.getProvincesByDepartment);
+router.get('/provinces/:provinceId/municipalities', propertyManagementController.getMunicipalitiesByProvince);
 
 // Rutas para gestión de inmuebles
 router.get("/", propertyManagementController.getAllProperties);
