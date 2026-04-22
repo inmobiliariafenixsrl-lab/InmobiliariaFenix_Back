@@ -19,6 +19,10 @@ router.patch("/:id/status", propertyManagementController.updatePropertyStatus);
 router.delete("/:id", propertyManagementController.deleteProperty);
 router.get("/:id/documents", propertyManagementController.getPropertyDocuments);
 
+router.post("/:id/media", upload.array('images', 12),propertyManagementController.uploadMedia);
+router.delete("/:propertyId/images/:imageId", propertyManagementController.deleteImage);
+router.delete("/:propertyId/video", propertyManagementController.deleteVideo);
+
 // Rutas para documentos
 router.post("/:id/documents", upload.single("pdf"), propertyManagementController.uploadDocument);
 router.get("/documents/:id/file", propertyManagementController.getDocumentFile);

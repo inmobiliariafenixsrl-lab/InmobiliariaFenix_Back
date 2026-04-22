@@ -322,6 +322,82 @@ const getUbications = async (req, res, next) => {
   }
 }
 
+const uploadMedia = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const files = req.files;
+    const { video_url } = req.body;
+
+    if (files && files.length > 12) {
+      return res.status(400).json({ 
+        error: `Máximo 12 imágenes permitidas. Actualmente: ${files.length}` 
+      });
+    }
+
+    if ((!files || files.length === 0) && (!video_url || !video_url.trim())) {
+      return res.status(400).json({ 
+        error: "Debe proporcionar al menos una imagen o un video" 
+      });
+    }
+
+    const result = await propertyManagementService.uploadMedia(
+      id, 
+      files || [], 
+      video_url
+    );
+
+    res.status(201).json(result);
+  } catch (error) {
+    console.error("Error in uploadMedia:", error);
+    res.status(500).json({ 
+      error: "Error al subir los archivos multimedia",
+      details: error.message 
+    });
+  }
+};
+
+const deleteImage = async (req, res) => {
+  try {
+    const { propertyId, imageId } = req.params;
+
+    const result = await propertyManagementService.deleteImage(propertyId, imageId);
+
+    if (!result) {
+      return res.status(404).json({ error: "Imagen no encontrada" });
+    }
+
+    res.status(200).json({ 
+      message: "Imagen eliminada correctamente",
+      data: result 
+    });
+  } catch (error) {
+    console.error("Error in deleteImage:", error);
+    res.status(500).json({ 
+      error: "Error al eliminar la imagen",
+      details: error.message 
+    });
+  }
+};
+
+const deleteVideo = async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+
+    const result = await propertyManagementService.deleteVideo(propertyId);
+
+    res.status(200).json({ 
+      message: "Video eliminado correctamente",
+      data: result 
+    });
+  } catch (error) {
+    console.error("Error in deleteVideo:", error);
+    res.status(500).json({ 
+      error: "Error al eliminar el video",
+      details: error.message 
+    });
+  }
+};
+
 module.exports = {
   getAllProperties,
   getPropertiesByAgent,
@@ -339,4 +415,7 @@ module.exports = {
   getAgentesByGroup,
   getAgenteById,
   getUbications,
+  uploadMedia,
+  deleteImage,
+  deleteVideo,
 };

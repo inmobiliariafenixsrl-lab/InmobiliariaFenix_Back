@@ -703,6 +703,182 @@ const getAllUbications = async () => {
   }
 };
 
+const uploadMedia = async (propertyId, imageFiles, videoUrl) => {
+  try {
+    await query('BEGIN');
+    
+    const results = {
+      images: [],
+      video: null
+    };
+    
+    if (imageFiles && imageFiles.length > 0) {
+      const valueSets = imageFiles.map((_, index) => {
+        const offset = index * 4;
+        return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4})`;
+      });
+      
+      const values = [];
+      imageFiles.forEach((imageFile, index) => {
+        values.push(
+          propertyId,
+          imageFile.buffer,
+          index === 0,
+          index
+        );
+      });
+      
+      const queryImagen = `
+        INSERT INTO imagen_inmueble (idinmueble, imagen, es_principal, orden)
+        VALUES ${valueSets.join(', ')}
+        RETURNING idimagen, es_principal, orden
+      `;
+      
+      const result = await query(queryImagen, values);
+      results.images = result.rows;
+    }
+    
+    if (videoUrl && videoUrl.trim()) {
+      const checkVideoQuery = `
+        SELECT enlace_video FROM inmueble 
+        WHERE idinmueble = $1
+      `;
+      const checkResult = await query(checkVideoQuery, [propertyId]);
+      
+      const updateVideoQuery = `
+        UPDATE inmueble 
+        SET enlace_video = $1 
+        WHERE idinmueble = $2
+        RETURNING enlace_video
+      `;
+      const updateResult = await query(updateVideoQuery, [videoUrl.trim(), propertyId]);
+      results.video = updateResult.rows[0].enlace_video;
+    }
+    
+    await query('COMMIT');
+    
+    return {
+      success: true,
+      message: "Multimedia subida correctamente",
+      data: results
+    };
+    
+  } catch (error) {
+    await query('ROLLBACK');
+    console.error("Error en uploadMedia service:", error);
+    throw error;
+  }
+};
+
+const deleteImage = async (propertyId, imageId) => {
+  try {
+    await query('BEGIN');
+    
+    const checkQuery = `
+      SELECT idimagen, es_principal, orden 
+      FROM imagen_inmueble 
+      WHERE idimagen = $1 AND idinmueble = $2
+    `;
+    const checkResult = await query(checkQuery, [imageId, propertyId]);
+    
+    if (checkResult.rows.length === 0) {
+      return null;
+    }
+    
+    const deletedImage = checkResult.rows[0];
+    const wasPrincipal = deletedImage.es_principal;
+    const deletedOrder = deletedImage.orden;
+    
+    const deleteQuery = `
+      DELETE FROM imagen_inmueble 
+      WHERE idimagen = $1 AND idinmueble = $2
+      RETURNING idimagen
+    `;
+    await query(deleteQuery, [imageId, propertyId]);
+    
+    const reorderQuery = `
+      UPDATE imagen_inmueble 
+      SET orden = orden - 1 
+      WHERE idinmueble = $1 AND orden > $2
+    `;
+    await query(reorderQuery, [propertyId, deletedOrder]);
+    
+    if (wasPrincipal) {
+      const getNewPrincipalQuery = `
+        SELECT idimagen FROM imagen_inmueble 
+        WHERE idinmueble = $1 
+        ORDER BY orden ASC 
+        LIMIT 1
+      `;
+      const newPrincipalResult = await query(getNewPrincipalQuery, [propertyId]);
+      
+      if (newPrincipalResult.rows.length > 0) {
+        const setNewPrincipalQuery = `
+          UPDATE imagen_inmueble 
+          SET es_principal = TRUE 
+          WHERE idimagen = $1
+        `;
+        await query(setNewPrincipalQuery, [newPrincipalResult.rows[0].idimagen]);
+      }
+    }
+    
+    await query('COMMIT');
+    
+    return {
+      deleted: true,
+      deleted_image: deletedImage,
+      was_principal: wasPrincipal
+    };
+    
+  } catch (error) {
+    await query('ROLLBACK');
+    console.error("Error en deleteImage service:", error);
+    throw error;
+  }
+};
+
+const deleteVideo = async (propertyId) => {
+  try {
+    await query('BEGIN');
+    
+    const checkQuery = `
+      SELECT enlace_video FROM inmueble 
+      WHERE idinmueble = $1 AND enlace_video IS NOT NULL
+    `;
+    const checkResult = await query(checkQuery, [propertyId]);
+    
+    if (checkResult.rows.length === 0) {
+      return {
+        deleted: false,
+        message: "No existe video asociado a esta propiedad"
+      };
+    }
+    
+    const deletedVideo = checkResult.rows[0].enlace_video;
+    
+    const deleteQuery = `
+      UPDATE inmueble 
+      SET enlace_video = NULL 
+      WHERE idinmueble = $1
+      RETURNING idinmueble
+    `;
+    await query(deleteQuery, [propertyId]);
+    
+    await query('COMMIT');
+    
+    return {
+      deleted: true,
+      deleted_video: deletedVideo,
+      message: "Video eliminado correctamente"
+    };
+    
+  } catch (error) {
+    await query('ROLLBACK');
+    console.error("Error en deleteVideo service:", error);
+    throw error;
+  }
+};
+
 module.exports = {
   getAllProperties,
   getPropertiesByAgent,
@@ -721,4 +897,7 @@ module.exports = {
   getAgentesByGroup,
   getAgenteById,
   getAllUbications,
+  uploadMedia,
+  deleteImage,
+  deleteVideo,
 };
