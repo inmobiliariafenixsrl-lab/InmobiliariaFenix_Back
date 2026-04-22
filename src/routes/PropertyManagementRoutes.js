@@ -22,6 +22,8 @@ router.get("/:id/documents", propertyManagementController.getPropertyDocuments);
 router.post("/:id/media", upload.array('images', 12),propertyManagementController.uploadMedia);
 router.delete("/:propertyId/images/:imageId", propertyManagementController.deleteImage);
 router.delete("/:propertyId/video", propertyManagementController.deleteVideo);
+router.get("/:propertyId/images/main", propertyManagementController.getPropertyMainImage);
+router.get("/:propertyId/images/:imageId", propertyManagementController.getPropertyImage);
 
 // Rutas para documentos
 router.post("/:id/documents", upload.single("pdf"), propertyManagementController.uploadDocument);

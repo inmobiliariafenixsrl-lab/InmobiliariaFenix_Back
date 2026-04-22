@@ -879,6 +879,56 @@ const deleteVideo = async (propertyId) => {
   }
 };
 
+const getPropertyMainImageById = async (propertyId) => {
+  try {
+    const result = await query(
+      `SELECT imagen, es_principal, orden
+       FROM imagen_inmueble 
+       WHERE idinmueble = $1 
+         AND es_principal = TRUE
+       LIMIT 1`,
+      [propertyId]
+    );
+
+    if (result.rows.length === 0 || !result.rows[0].imagen) {
+      return null;
+    }
+
+    return result.rows[0].imagen;
+  } catch (error) {
+    console.error("Error en getPropertyMainImageById:", error);
+    throw error;
+  }
+};
+
+
+const getPropertyImageById = async (imageId, propertyId = null) => {
+  try {
+    let queryText = `
+      SELECT imagen, idinmueble, es_principal, orden
+      FROM imagen_inmueble 
+      WHERE idimagen = $1
+    `;
+    let params = [imageId];
+    
+    if (propertyId) {
+      queryText += ` AND idinmueble = $2`;
+      params.push(propertyId);
+    }
+    
+    const result = await query(queryText, params);
+
+    if (result.rows.length === 0 || !result.rows[0].imagen) {
+      return null;
+    }
+
+    return result.rows[0].imagen;
+  } catch (error) {
+    console.error("Error en getPropertyImageById:", error);
+    throw error;
+  }
+};
+
 module.exports = {
   getAllProperties,
   getPropertiesByAgent,
@@ -900,4 +950,7 @@ module.exports = {
   uploadMedia,
   deleteImage,
   deleteVideo,
+  getPropertyMainImageById,
+  getPropertyImageById,
+
 };

@@ -398,6 +398,56 @@ const deleteVideo = async (req, res) => {
   }
 };
 
+const getPropertyMainImage = async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+    
+    const imageBuffer = await propertyManagementService.getPropertyMainImageById(propertyId);
+    
+    if (!imageBuffer) {
+      return res.status(404).json({ error: "Imagen no encontrada" });
+    }
+    
+    res.set({
+      'Content-Type': 'image/jpeg',
+      'Cache-Control': 'public, max-age=3600',
+    });
+
+    res.send(imageBuffer);
+    
+  } catch (error) {
+    console.error("Error in getPropertyImage:", error);
+    res.status(500).json({ error: "Error al obtener la imagen" });
+  }
+};
+
+const getPropertyImage = async (req, res) => {
+  try {
+    const { propertyId, imageId } = req.params;
+    
+    if (!imageId) {
+      return res.status(400).json({ error: "El ID de la imagen es obligatorio" });
+    }
+
+    const imageBuffer = await propertyManagementService.getPropertyImageById(imageId, propertyId);
+    
+    if (!imageBuffer) {
+      return res.status(404).json({ error: "Imagen no encontrada" });
+    }
+    
+    res.set({
+      'Content-Type': 'image/jpeg',
+      'Cache-Control': 'public, max-age=3600',
+    });
+
+    res.send(imageBuffer);
+    
+  } catch (error) {
+    console.error("Error in getPropertyImage:", error);
+    res.status(500).json({ error: "Error al obtener la imagen" });
+  }
+};
+
 module.exports = {
   getAllProperties,
   getPropertiesByAgent,
@@ -418,4 +468,6 @@ module.exports = {
   uploadMedia,
   deleteImage,
   deleteVideo,
+  getPropertyMainImage,
+  getPropertyImage
 };
