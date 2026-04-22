@@ -448,6 +448,40 @@ const getPropertyImage = async (req, res) => {
   }
 };
 
+const getPropertyImagesMetadata = async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+    
+    if (!propertyId) {
+      return res.status(400).json({ 
+        error: "El ID del inmueble es obligatorio" 
+      });
+    }
+    
+    const property = await propertyManagementService.getPropertyById(propertyId);
+    if (!property) {
+      return res.status(404).json({ 
+        error: "Inmueble no encontrado" 
+      });
+    }
+    
+    const imagesMetadata = await propertyManagementService.getPropertyImagesMetadata(propertyId);
+    
+    res.status(200).json({
+      success: true,
+      data: imagesMetadata,
+      message: "Metadatos de imágenes obtenidos exitosamente"
+    });
+    
+  } catch (error) {
+    console.error("Error in getPropertyImagesMetadata:", error);
+    res.status(500).json({ 
+      error: "Error al obtener los metadatos de las imágenes",
+      details: error.message 
+    });
+  }
+};
+
 module.exports = {
   getAllProperties,
   getPropertiesByAgent,
@@ -469,5 +503,7 @@ module.exports = {
   deleteImage,
   deleteVideo,
   getPropertyMainImage,
-  getPropertyImage
+  getPropertyImage,
+  getPropertyImagesMetadata,
+
 };

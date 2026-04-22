@@ -929,6 +929,34 @@ const getPropertyImageById = async (imageId, propertyId = null) => {
   }
 };
 
+const getPropertyImagesMetadata = async (propertyId) => {
+  try {
+    const result = await query(
+      `SELECT idimagen, es_principal, orden
+       FROM imagen_inmueble 
+       WHERE idinmueble = $1 
+       ORDER BY orden ASC, es_principal DESC`,
+      [propertyId]
+    );
+
+    if (result.rows.length === 0) {
+      return [];
+    }
+
+    const imagesWithUrl = result.rows.map(image => ({
+      idimagen: image.idimagen,
+      es_principal: image.es_principal,
+      orden: image.orden,
+      url: `/inmuebles/${propertyId}/images/${image.idimagen}`
+    }));
+
+    return imagesWithUrl;
+  } catch (error) {
+    console.error("Error en getPropertyImagesMetadata:", error);
+    throw error;
+  }
+};
+
 module.exports = {
   getAllProperties,
   getPropertiesByAgent,
@@ -952,5 +980,5 @@ module.exports = {
   deleteVideo,
   getPropertyMainImageById,
   getPropertyImageById,
-
+  getPropertyImagesMetadata,
 };
