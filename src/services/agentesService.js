@@ -132,13 +132,9 @@ const getAgenteById = async (id) => {
         a.fecha_creacion as "joinDate",
         a.idgrupo as "groupId",
         g.nombre as "groupName",
-        a.facebook,
-        a.instagram,
-        a.tiktok,
-        a.youtube,
         a.porcentajeComision as "porcentajeComision"
-      FROM Agente a
-      LEFT JOIN Grupo g ON a.idgrupo = g.idgrupo
+      FROM agente a
+      LEFT JOIN grupo g ON a.idgrupo = g.idgrupo
       WHERE a.idAgente = $1 AND a.estado != 'eliminado'`,
       [id]
     );
@@ -148,9 +144,54 @@ const getAgenteById = async (id) => {
     }
     
     const agente = result.rows[0];
-    const date = Date.now()
+    
+    const socialMediaResult = await query(
+      `SELECT 
+        tsr.nombre as type,
+        rsa.url,
+        rsa.otro_nombre as "customName"
+      FROM red_social_agente rsa
+      JOIN tipo_red_social tsr ON rsa.idtipo_red_social = tsr.idtipo_red_social
+      WHERE rsa.idagente = $1`,
+      [id]
+    );
+    
+    const socialMedia = {};
+    socialMediaResult.rows.forEach(sm => {
+      const type = sm.type.toLowerCase();
+      if (type === 'facebook') {
+        socialMedia.facebook = sm.url;
+      } else if (type === 'instagram') {
+        socialMedia.instagram = sm.url;
+      } else if (type === 'tiktok') {
+        socialMedia.tiktok = sm.url;
+      } else if (type === 'youtube') {
+        socialMedia.youtube = sm.url;
+      } else if (type === 'otro' && sm.customName) {
+        socialMedia[sm.customName.toLowerCase()] = sm.url;
+      }
+    });
+    
+    const date = Date.now();
+    
     return {
-      ...agente,
+      id: agente.id,
+      name: agente.name,
+      lastName: agente.lastName,
+      email: agente.email,
+      phone: agente.phone,
+      ci: agente.ci,
+      address: agente.address,
+      specialization: agente.specialization,
+      role: agente.role,
+      estado: agente.estado,
+      groupId: agente.groupId,
+      groupName: agente.groupName,
+      porcentajeComision: agente.porcentajeComision,
+      facebook: socialMedia.facebook || null,
+      instagram: socialMedia.instagram || null,
+      tiktok: socialMedia.tiktok || null,
+      youtube: socialMedia.youtube || null,
       photo: `/agentes/photo/${agente.id}?t=${date}`,
       active: agente.estado === 'activo',
       joinDate: agente.joinDate ? new Date(agente.joinDate).toISOString().split('T')[0] : null,
@@ -228,46 +269,84 @@ const createAgente = async (agenteData, user) => {
     
     const estado = 'activo';
     
-    const result = await query(
-      `INSERT INTO Agente (
-        nombre, apellido, email, telefono, ci, direccion, 
-        foto, especializacion, rol, estado, idgrupo, contrasenia,
-        facebook, instagram, tiktok, youtube, porcentajecomision
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-      RETURNING 
-        idAgente as id,
-        nombre as name,
-        apellido as "lastName",
-        email,
-        telefono as phone,
-        ci,
-        direccion as address,
-        foto as photo,
-        especializacion as specialization,
-        rol as role,
-        estado,
-        fecha_creacion as "joinDate",
-        idgrupo as "groupId"`,
-      [
-        name, lastName, email, phone, ci, address,
-        photo ? Buffer.from(photo.split(',')[1], 'base64') : null,
-        specialization, role, estado, groupId || null, hashedPassword,
-        facebook ? facebook : null, instagram ? instagram : null, tiktok ? tiktok : null,
-        youtube ? youtube : null, porcentajeComision ? porcentajeComision : 1
-      ]
-    );
+    await query('BEGIN');
     
-    const nuevoAgente = result.rows[0];
-    return {
-      ...nuevoAgente,
-      active: nuevoAgente.estado === 'activo',
-      joinDate: nuevoAgente.joinDate ? new Date(nuevoAgente.joinDate).toISOString().split('T')[0] : null,
-      propertiesCount: 0,
-      capturedProperties: [],
-      photo: nuevoAgente.photo 
-        ? `/agentes/photo/${nuevoAgente.id}?t=${Date.now()}`
-        : null
-    };
+    try {
+      const result = await query(
+        `INSERT INTO agente (
+          nombre, apellido, email, telefono, ci, direccion, 
+          foto, especializacion, rol, estado, idgrupo, contrasenia,
+          porcentajecomision
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        RETURNING 
+          idAgente as id,
+          nombre as name,
+          apellido as "lastName",
+          email,
+          telefono as phone,
+          ci,
+          direccion as address,
+          foto as photo,
+          especializacion as specialization,
+          rol as role,
+          estado,
+          fecha_creacion as "joinDate",
+          idgrupo as "groupId"`,
+        [
+          name, lastName, email, phone, ci, address,
+          photo ? Buffer.from(photo.split(',')[1], 'base64') : null,
+          specialization, role, estado, groupId || null, hashedPassword,
+          porcentajeComision ? porcentajeComision : 1
+        ]
+      );
+      
+      const nuevoAgente = result.rows[0];
+      const agenteId = nuevoAgente.id;
+      
+      const socialNetworks = [
+        { type: 'Facebook', url: facebook },
+        { type: 'Instagram', url: instagram },
+        { type: 'Tiktok', url: tiktok },
+        { type: 'Youtube', url: youtube }
+      ];
+      
+      for (const social of socialNetworks) {
+        if (social.url) {
+          const tipoResult = await query(
+            `SELECT idtipo_red_social FROM tipo_red_social WHERE nombre = $1`,
+            [social.type]
+          );
+          
+          if (tipoResult.rows.length > 0) {
+            await query(
+              `INSERT INTO red_social_agente (idagente, idtipo_red_social, url)
+               VALUES ($1, $2, $3)`,
+              [agenteId, tipoResult.rows[0].idtipo_red_social, social.url]
+            );
+          }
+        }
+      }
+      
+      await query('COMMIT');
+      
+      return {
+        ...nuevoAgente,
+        active: nuevoAgente.estado === 'activo',
+        joinDate: nuevoAgente.joinDate ? new Date(nuevoAgente.joinDate).toISOString().split('T')[0] : null,
+        propertiesCount: 0,
+        capturedProperties: [],
+        photo: nuevoAgente.photo 
+          ? `/agentes/photo/${nuevoAgente.id}?t=${Date.now()}`
+          : null,
+        facebook: facebook || null,
+        instagram: instagram || null,
+        tiktok: tiktok || null,
+        youtube: youtube || null
+      };
+    } catch (error) {
+      await query('ROLLBACK');
+      throw error;
+    }
   } catch (error) {
     console.error("Error en createAgente:", error);
     
@@ -392,134 +471,129 @@ const updateAgente = async (id, agenteData, user) => {
       }
     }
 
-    const updates = [];
-    const values = [];
-    let paramIndex = 1;
+    await query('BEGIN');
     
-    if (name !== undefined) {
-      updates.push(`nombre = $${paramIndex++}`);
-      values.push(name);
-    }
-    if (lastName !== undefined) {
-      updates.push(`apellido = $${paramIndex++}`);
-      values.push(lastName);
-    }
-    if (email !== undefined) {
-      updates.push(`email = $${paramIndex++}`);
-      values.push(email);
-    }
-    if (phone !== undefined) {
-      updates.push(`telefono = $${paramIndex++}`);
-      values.push(phone);
-    }
-    if (ci !== undefined) {
-      updates.push(`ci = $${paramIndex++}`);
-      values.push(ci);
-    }
-    if (address !== undefined) {
-      updates.push(`direccion = $${paramIndex++}`);
-      values.push(address);
-    }
-    
-    if (photo !== undefined) {
-      if (photo === null || photo === '') {
-        updates.push(`foto = NULL`);
-      } else {
-        updates.push(`foto = $${paramIndex++}`);
-        const base64Data = photo.includes(',') ? photo.split(',')[1] : photo;
-        values.push(Buffer.from(base64Data, 'base64'));
+    try {
+      const updates = [];
+      const values = [];
+      let paramIndex = 1;
+      
+      if (name !== undefined) {
+        updates.push(`nombre = $${paramIndex++}`);
+        values.push(name);
       }
-    }
-    
-    if (specialization !== undefined) {
-      updates.push(`especializacion = $${paramIndex++}`);
-      values.push(specialization);
-    }
-    if (role !== undefined) {
-      updates.push(`rol = $${paramIndex++}`);
-      values.push(role);
-    }
-    
-    if (forceGroupIdNull) {
-      updates.push(`idgrupo = NULL`);
-    } else if (groupId !== undefined) {
-      updates.push(`idgrupo = $${paramIndex++}`);
-      values.push(groupId || null);
-    }
-    
-    if (active !== undefined) {
-      const estado = active === false ? 'inactivo' : 'activo';
-      updates.push(`estado = $${paramIndex++}`);
-      values.push(estado);
-    }
+      if (lastName !== undefined) {
+        updates.push(`apellido = $${paramIndex++}`);
+        values.push(lastName);
+      }
+      if (email !== undefined) {
+        updates.push(`email = $${paramIndex++}`);
+        values.push(email);
+      }
+      if (phone !== undefined) {
+        updates.push(`telefono = $${paramIndex++}`);
+        values.push(phone);
+      }
+      if (ci !== undefined) {
+        updates.push(`ci = $${paramIndex++}`);
+        values.push(ci);
+      }
+      if (address !== undefined) {
+        updates.push(`direccion = $${paramIndex++}`);
+        values.push(address);
+      }
+      
+      if (photo !== undefined) {
+        if (photo === null || photo === '') {
+          updates.push(`foto = NULL`);
+        } else {
+          updates.push(`foto = $${paramIndex++}`);
+          const base64Data = photo.includes(',') ? photo.split(',')[1] : photo;
+          values.push(Buffer.from(base64Data, 'base64'));
+        }
+      }
+      
+      if (specialization !== undefined) {
+        updates.push(`especializacion = $${paramIndex++}`);
+        values.push(specialization);
+      }
+      if (role !== undefined) {
+        updates.push(`rol = $${paramIndex++}`);
+        values.push(role);
+      }
+      
+      if (forceGroupIdNull) {
+        updates.push(`idgrupo = NULL`);
+      } else if (groupId !== undefined) {
+        updates.push(`idgrupo = $${paramIndex++}`);
+        values.push(groupId || null);
+      }
+      
+      if (active !== undefined) {
+        const estado = active === false ? 'inactivo' : 'activo';
+        updates.push(`estado = $${paramIndex++}`);
+        values.push(estado);
+      }
 
-    if (facebook !== undefined) {
-      updates.push(`facebook = $${paramIndex++}`);
-      values.push(facebook);
+      if (porcentajeComision !== undefined) {
+        updates.push(`porcentajecomision = $${paramIndex++}`);
+        values.push(porcentajeComision);
+      }
+      
+      if (updates.length > 0) {
+        values.push(id);
+        
+        await query(
+          `UPDATE Agente 
+           SET ${updates.join(', ')} 
+           WHERE idAgente = $${paramIndex} AND estado != 'eliminado'`,
+          values
+        );
+      }
+      
+      const socialNetworks = [
+        { type: 'Facebook', url: facebook },
+        { type: 'Instagram', url: instagram },
+        { type: 'Tiktok', url: tiktok },
+        { type: 'Youtube', url: youtube }
+      ];
+      
+      for (const social of socialNetworks) {
+        if (social.url !== undefined) {
+          await query(
+            `DELETE FROM red_social_agente 
+             WHERE idagente = $1 AND idtipo_red_social = (
+               SELECT idtipo_red_social FROM tipo_red_social WHERE nombre = $2
+             )`,
+            [id, social.type]
+          );
+          
+          if (social.url && social.url.trim() !== '') {
+            const tipoResult = await query(
+              `SELECT idtipo_red_social FROM tipo_red_social WHERE nombre = $1`,
+              [social.type]
+            );
+            
+            if (tipoResult.rows.length > 0) {
+              await query(
+                `INSERT INTO red_social_agente (idagente, idtipo_red_social, url)
+                 VALUES ($1, $2, $3)`,
+                [id, tipoResult.rows[0].idtipo_red_social, social.url]
+              );
+            }
+          }
+        }
+      }
+      
+      await query('COMMIT');
+      
+      const agenteActualizado = await getAgenteById(id);
+      return agenteActualizado;
+      
+    } catch (error) {
+      await query('ROLLBACK');
+      throw error;
     }
-
-    if  (instagram !== undefined) {
-      updates.push(`instagram = $${paramIndex++}`);
-      values.push(instagram);
-    }
-
-    if  (tiktok !== undefined) {
-      updates.push(`tiktok = $${paramIndex++}`);
-      values.push(tiktok);
-    }
-
-    if  (youtube !== undefined) {
-      updates.push(`youtube = $${paramIndex++}`);
-      values.push(youtube);
-    }
-
-    if  (porcentajeComision !== undefined) {
-      updates.push(`porcentajecomision = $${paramIndex++}`);
-      values.push(porcentajeComision);
-    }
-    
-    if (updates.length === 0) {
-      return await getAgenteById(id);
-    }
-    
-    values.push(id);
-    
-    const result = await query(
-      `UPDATE Agente 
-       SET ${updates.join(', ')} 
-       WHERE idAgente = $${paramIndex} AND estado != 'eliminado'
-       RETURNING 
-        idAgente as id,
-        nombre as name,
-        apellido as "lastName",
-        email,
-        telefono as phone,
-        ci,
-        direccion as address,
-        foto as photo,
-        especializacion as specialization,
-        rol as role,
-        estado,
-        fecha_creacion as "joinDate",
-        idgrupo as "groupId"`,
-      values
-    );
-    
-    if (result.rows.length === 0) {
-      return null;
-    }
-    
-    const agenteActualizado = result.rows[0];
-    return {
-      ...agenteActualizado,
-      active: agenteActualizado.estado === 'activo',
-      joinDate: agenteActualizado.joinDate 
-        ? new Date(agenteActualizado.joinDate).toISOString().split('T')[0] 
-        : null,
-      photo: agenteActualizado.photo 
-        ? `/agentes/photo/${agenteActualizado.id}?t=${Date.now()}`
-        : null
-    };
   } catch (error) {
     console.error("Error en updateAgente:", error);
     if (error.code === '23505') {
