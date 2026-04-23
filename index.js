@@ -59,6 +59,9 @@ app.use("/api/agentes", agentesRoutes);
 const sidebarRoutes = require("./src/routes/sidebarRoutes");
 app.use("/api/agentes", sidebarRoutes);
 
+const pingRoutes = require("./src/routes/pingRoutes");
+app.use("/api/monitor", pingRoutes);
+
 // Manejador de errores global
 app.use((err, req, res, next) => {
   console.error(err.stack);
