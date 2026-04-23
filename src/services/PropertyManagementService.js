@@ -943,11 +943,13 @@ const getPropertyImagesMetadata = async (propertyId) => {
       return [];
     }
 
+    const date = Date.now();
+
     const imagesWithUrl = result.rows.map(image => ({
       idimagen: image.idimagen,
       es_principal: image.es_principal,
       orden: image.orden,
-      url: `/inmuebles/${propertyId}/images/${image.idimagen}`
+      url: `/inmuebles/${propertyId}/images/${image.idimagen}?t=${date}`
     }));
 
     return imagesWithUrl;

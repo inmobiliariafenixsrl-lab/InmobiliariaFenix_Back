@@ -437,7 +437,6 @@ const getPropertyImage = async (req, res) => {
     
     res.set({
       'Content-Type': 'image/jpeg',
-      'Cache-Control': 'public, max-age=3600',
     });
 
     res.send(imageBuffer);
