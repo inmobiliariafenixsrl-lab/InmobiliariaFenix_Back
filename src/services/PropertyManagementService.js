@@ -728,6 +728,13 @@ const uploadMedia = async (propertyId, imageFiles, videoUrl) => {
         );
       });
       
+      const deleteQuery = `
+        DELETE FROM imagen_inmueble 
+        WHERE idinmueble = $1
+        RETURNING idimagen
+      `;
+      await query(deleteQuery, [propertyId]);
+
       const queryImagen = `
         INSERT INTO imagen_inmueble (idinmueble, imagen, es_principal, orden)
         VALUES ${valueSets.join(', ')}
