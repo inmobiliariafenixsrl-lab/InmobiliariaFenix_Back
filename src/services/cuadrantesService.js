@@ -204,22 +204,14 @@ class CuadrantesService {
 
   async updateCuadrante(id, cuadranteData) {
     try {
-      // Primero verificamos si la zona existe
-      const checkQuery = 'SELECT idcuadrante FROM Cuadrante WHERE idcuadrante = $1';
+      const checkQuery = 'SELECT idcuadrante, puntos FROM Cuadrante WHERE idcuadrante = $1';
       const checkResult = await query(checkQuery, [id]);
       
       if (checkResult.rows.length === 0) {
         return null;
       }
       
-      const updates = [];
-      const values = [];
-      let paramCount = 1;
-      
-      if (cuadranteData.name !== undefined) {
-        updates.push(`nombre = $${paramCount++}`);
-        values.push(cuadranteData.name);
-      }
+      let pointsToUse = checkResult.rows[0].puntos;
       
       if (cuadranteData.points !== undefined) {
         if (!Array.isArray(cuadranteData.points) || cuadranteData.points.length < 3) {
@@ -238,7 +230,21 @@ class CuadrantesService {
             throw new Error(`Las coordenadas del punto ${i} no pueden ser NaN`);
           }
         }
-        
+        pointsToUse = cuadranteData.points;
+      }
+      
+      const preciosCalculados = await this.calcularPreciosPromedioCuadrante(pointsToUse);
+      
+      const updates = [];
+      const values = [];
+      let paramCount = 1;
+      
+      if (cuadranteData.name !== undefined) {
+        updates.push(`nombre = $${paramCount++}`);
+        values.push(cuadranteData.name);
+      }
+      
+      if (cuadranteData.points !== undefined) {
         updates.push(`puntos = $${paramCount++}`);
         values.push(JSON.stringify(cuadranteData.points));
       }
@@ -248,10 +254,11 @@ class CuadrantesService {
         values.push(cuadranteData.description);
       }
       
-      if (cuadranteData.price !== undefined) {
-        updates.push(`precio = $${paramCount++}`);
-        values.push(cuadranteData.price);
-      }
+      updates.push(`precio = $${paramCount++}`);
+      values.push(preciosCalculados.precioTerreno);
+      
+      updates.push(`precio_construccion = $${paramCount++}`);
+      values.push(preciosCalculados.precioConstruccion);
       
       if (updates.length === 0) {
         throw new Error('No hay datos para actualizar');
@@ -268,7 +275,8 @@ class CuadrantesService {
           nombre as name,
           puntos as points,
           descripcion as description,
-          precio as price
+          precio as price,
+          precio_construccion as precio_construccion
       `;
       
       const result = await query(consulta, values);
@@ -279,7 +287,8 @@ class CuadrantesService {
         name: updatedCuadrante.name,
         points: updatedCuadrante.points,
         description: updatedCuadrante.description || '',
-        price: parseFloat(updatedCuadrante.price),
+        price: parseFloat(updatedCuadrante.price) || 0,
+        precioConstruccion: parseFloat(updatedCuadrante.precio_construccion) || 0,
         color: this.generateColorFromId(updatedCuadrante.id),
       };
     } catch (error) {
@@ -314,6 +323,41 @@ class CuadrantesService {
     const colors = ['#ff0000', '#00ff00', '#0000ff', '#a88900', '#ff00ff', '#00ffff', '#ff6600', '#a00c47', '#3f3f3f'];
     if (!id) return colors[Math.floor(Math.random() * colors.length)];
     return colors[id % colors.length];
+  }
+
+  async recalcularPreciosTodosCuadrantes() {
+    try {
+      const cuadrantesQuery = 'SELECT idcuadrante, puntos FROM Cuadrante';
+      const cuadrantesResult = await query(cuadrantesQuery);
+      
+      for (const cuadrante of cuadrantesResult.rows) {
+        const preciosCalculados = await this.calcularPreciosPromedioCuadrante(cuadrante.puntos);
+        
+        const updateQuery = `
+          UPDATE Cuadrante 
+          SET precio = $1, precio_construccion = $2
+          WHERE idcuadrante = $3
+        `;
+        
+        await query(updateQuery, [
+          preciosCalculados.precioTerreno,
+          preciosCalculados.precioConstruccion,
+          cuadrante.idcuadrante
+        ]);
+      }
+      
+      await query('COMMIT');
+      
+      return {
+        success: true,
+        message: `Se actualizaron ${cuadrantesResult.rows.length} cuadrantes`,
+        totalCuadrantes: cuadrantesResult.rows.length
+      };
+      
+    } catch (error) {
+      await query('ROLLBACK');
+      throw new Error(`Error al recalcular precios: ${error.message}`);
+    }
   }
 }
 
