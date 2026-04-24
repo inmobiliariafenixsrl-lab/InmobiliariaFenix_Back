@@ -33,19 +33,19 @@ class CuadrantesService {
 
   async createCuadrante(cuadranteData) {
     try {
+      await query('BEGIN');
+      
       const {
         name,
         points,
         description = '',
-        price,
         color = this.generateColorFromId(null)
       } = cuadranteData;
       
-      // Validar que points sea un array válido
       if (!Array.isArray(points) || points.length < 3) {
         throw new Error('El polígono debe tener al menos 3 puntos');
       }
-
+      
       for (let i = 0; i < points.length; i++) {
         const point = points[i];
         if (!Array.isArray(point) || point.length !== 2) {
@@ -59,32 +59,145 @@ class CuadrantesService {
         }
       }
       
-      const consulta = `
-        INSERT INTO Cuadrante (nombre, puntos, descripcion, precio)
-        VALUES ($1, $2, $3, $4)
+      const insertQuery = `
+        INSERT INTO Cuadrante (nombre, puntos, descripcion, precio, precio_construccion)
+        VALUES ($1, $2, $3, 0, 0)
+        RETURNING idcuadrante
+      `;
+      
+      const insertResult = await query(insertQuery, [
+        name,
+        JSON.stringify(points),
+        description
+      ]);
+      
+      const cuadranteId = insertResult.rows[0].idcuadrante;
+      
+      const preciosCalculados = await this.calcularPreciosPromedioCuadrante(
+        points
+      );
+      
+      const updateQuery = `
+        UPDATE Cuadrante
+        SET precio = $1, precio_construccion = $2
+        WHERE idcuadrante = $3
         RETURNING 
           idcuadrante as id,
           nombre as name,
           puntos as points,
           descripcion as description,
-          precio as price
+          precio as price,
+          precio_construccion as precio_construccion
       `;
       
-      const values = [name, JSON.stringify(points), description, price];
-      const result = await query(consulta, values);
+      const updateResult = await query(updateQuery, [
+        preciosCalculados.precioTerreno,
+        preciosCalculados.precioConstruccion,
+        cuadranteId
+      ]);
       
-      const newCuadrante = result.rows[0];
+      await query('COMMIT');
+      
+      const newCuadrante = updateResult.rows[0];
       
       return {
         id: newCuadrante.id.toString(),
         name: newCuadrante.name,
         points: newCuadrante.points,
         description: newCuadrante.description || '',
-        price: parseFloat(newCuadrante.price),
-        color: color
+        price: parseFloat(newCuadrante.price) || 0,
+        precioConstruccion: parseFloat(newCuadrante.precio_construccion) || 0,
+        color: color,
       };
+      
     } catch (error) {
+      await query('ROLLBACK');
       throw new Error(`Error al crear zona: ${error.message}`);
+    }
+  }
+
+  async calcularPreciosPromedioCuadrante(points) {
+    try {
+      const polygonPoints = points
+        .map(point => `${point[1]} ${point[0]}`) // lng lat
+        .join(',');
+      
+      const firstPoint = points[0];
+      const closedPolygon = `${polygonPoints},${firstPoint[1]} ${firstPoint[0]}`;
+      
+      const consulta = `
+        WITH inmuebles_en_cuadrante AS (
+          SELECT 
+            idInmueble,
+            m2_terreno,
+            m2_construccion,
+            precio_capatacion_m,
+            precio_capatacion_s,
+            precio_captacion_i,
+            tipo_cambio_captacion,
+            operacion,
+            CASE 
+              -- Calcular precio por m² de terreno
+              WHEN m2_terreno > 0 AND precio_capatacion_s > 0 
+              THEN precio_capatacion_s / m2_terreno
+              WHEN m2_terreno > 0 AND precio_capatacion_m > 0 
+              THEN precio_capatacion_m / m2_terreno
+              ELSE NULL
+            END as precio_m2_terreno,
+            CASE 
+              -- Calcular precio por m² de construcción
+              WHEN m2_construccion > 20 AND precio_capatacion_s > 0 
+              THEN precio_capatacion_s / m2_construccion
+              WHEN m2_construccion > 20 AND precio_capatacion_m > 0 
+              THEN precio_capatacion_m / m2_construccion
+              ELSE NULL
+            END as precio_m2_construccion
+          FROM inmueble
+          WHERE 
+            operacion = 'venta'
+            AND longitud IS NOT NULL 
+            AND latitud IS NOT NULL
+            AND ST_Contains(
+              ST_GeomFromText('POLYGON((${closedPolygon}))', 4326),
+              ST_SetSRID(ST_MakePoint(longitud, latitud), 4326)
+            )
+        )
+        SELECT 
+          COUNT(*) as total_inmuebles,
+          COUNT(precio_m2_terreno) as inmuebles_con_precio_terreno,
+          COUNT(precio_m2_construccion) as inmuebles_con_precio_construccion,
+          COALESCE(AVG(precio_m2_terreno), 0) as promedio_terreno,
+          COALESCE(AVG(precio_m2_construccion), 0) as promedio_construccion,
+          COALESCE(STDDEV(precio_m2_terreno), 0) as desviacion_terreno,
+          COALESCE(STDDEV(precio_m2_construccion), 0) as desviacion_construccion,
+          COALESCE(MIN(precio_m2_terreno), 0) as min_terreno,
+          COALESCE(MAX(precio_m2_terreno), 0) as max_terreno,
+          COALESCE(MIN(precio_m2_construccion), 0) as min_construccion,
+          COALESCE(MAX(precio_m2_construccion), 0) as max_construccion
+        FROM inmuebles_en_cuadrante
+      `;
+      
+      const result = await query(consulta);
+      const stats = result.rows[0];
+      
+      return {
+        precioTerreno: Math.round(parseFloat(stats.promedio_terreno) || 0),
+        precioConstruccion: Math.round(parseFloat(stats.promedio_construccion) || 0),
+      };
+      
+    } catch (error) {
+      console.error('Error en calcularPreciosPromedioCuadrante:', error);
+      return {
+        precioTerreno: 0,
+        precioConstruccion: 0,
+        estadisticas: {
+          totalInmuebles: 0,
+          inmueblesConPrecioTerreno: 0,
+          inmueblesConPrecioConstruccion: 0,
+          rangoTerreno: { min: 0, max: 0, desviacion: 0 },
+          rangoConstruccion: { min: 0, max: 0, desviacion: 0 }
+        }
+      };
     }
   }
 

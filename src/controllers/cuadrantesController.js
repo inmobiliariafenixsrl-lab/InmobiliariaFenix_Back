@@ -22,10 +22,10 @@ const createCuadrante = async (req, res) => {
     const cuadranteData = req.body;
     
     // Validar datos requeridos
-    if (!cuadranteData.name || !cuadranteData.points || !cuadranteData.price) {
+    if (!cuadranteData.name || !cuadranteData.points) {
       return res.status(400).json({
         success: false,
-        message: 'Faltan datos requeridos: name, points, price'
+        message: 'Faltan datos requeridos: name, points'
       });
     }
 
