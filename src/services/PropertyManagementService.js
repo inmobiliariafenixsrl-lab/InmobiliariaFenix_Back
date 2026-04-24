@@ -281,6 +281,7 @@ const savePropertyProgress = async (propertyData, documents = null) => {
     idmunicipio,
     nombre_propietario,
     celular_propietario,
+    porcentajeComision,
   } = propertyData;
 
   const validatedTipoPropiedad = validatePropertyType(tipo_propiedad);
@@ -309,8 +310,8 @@ const savePropertyProgress = async (propertyData, documents = null) => {
         ascensor, garaje, terraza, piscina, año_construccion,
         latitud, longitud, idagente, estado, observacion,
         enlace_video, idmunicipio, nombre_propietario, celular_propietario,
-        fecha_creacion
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, TIMEZONE('America/La_Paz', NOW()))
+        porcentajeComision, fecha_creacion
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, TIMEZONE('America/La_Paz', NOW()))
       RETURNING *`,
       [
         titulo || "",
@@ -343,6 +344,7 @@ const savePropertyProgress = async (propertyData, documents = null) => {
         idmunicipio || null,
         nombre_propietario || null,
         celular_propietario || null,
+        porcentajeComision || 1,
       ],
     );
 
@@ -391,6 +393,7 @@ const updateProperty = async (id, propertyData, documents = null) => {
     idmunicipio,
     nombre_propietario,
     celular_propietario,
+    porcentajeComision,
   } = propertyData;
 
   const validatedTipoPropiedad = validatePropertyType(tipo_propiedad);
@@ -436,8 +439,9 @@ const updateProperty = async (id, propertyData, documents = null) => {
         enlace_video = $26,
         idmunicipio = $27,
         nombre_propietario = $28,
-        celular_propietario = $29
-      WHERE idinmueble = $30
+        celular_propietario = $29,
+        porcentajeComision = $30
+      WHERE idinmueble = $31
       RETURNING *`,
       [
         titulo || "",
@@ -469,6 +473,7 @@ const updateProperty = async (id, propertyData, documents = null) => {
         idmunicipio || null,
         nombre_propietario || null,
         celular_propietario || null,
+        porcentajeComision || 1,
         id,
       ],
     );
