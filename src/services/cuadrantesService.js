@@ -346,8 +346,6 @@ class CuadrantesService {
         ]);
       }
       
-      await query('COMMIT');
-      
       return {
         success: true,
         message: `Se actualizaron ${cuadrantesResult.rows.length} cuadrantes`,
@@ -355,7 +353,6 @@ class CuadrantesService {
       };
       
     } catch (error) {
-      await query('ROLLBACK');
       throw new Error(`Error al recalcular precios: ${error.message}`);
     }
   }
