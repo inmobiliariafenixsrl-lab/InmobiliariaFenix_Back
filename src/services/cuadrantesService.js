@@ -9,7 +9,8 @@ class CuadrantesService {
           nombre as name,
           puntos as points,
           descripcion as description,
-          precio as price
+          precio as price,
+          precio_construccion
         FROM Cuadrante
         ORDER BY idcuadrante DESC
       `;
@@ -310,7 +311,7 @@ class CuadrantesService {
   }
 
   generateColorFromId(id) {
-    const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ff6600', '#a00c47', '#999999'];
+    const colors = ['#ff0000', '#00ff00', '#0000ff', '#a88900', '#ff00ff', '#00ffff', '#ff6600', '#a00c47', '#3f3f3f'];
     if (!id) return colors[Math.floor(Math.random() * colors.length)];
     return colors[id % colors.length];
   }
