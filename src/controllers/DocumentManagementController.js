@@ -3,7 +3,8 @@ const documentManagementService = require("../services/DocumentManagementService
 class DocumentManagementController {
   async getPropertiesInReview(req, res) {
     try {
-      const properties = await documentManagementService.getPropertiesInReview();
+      const user = req.user;
+      const properties = await documentManagementService.getPropertiesInReview(user);
       res.json(properties);
     } catch (error) {
       console.error("Error in getPropertiesInReview:", error);

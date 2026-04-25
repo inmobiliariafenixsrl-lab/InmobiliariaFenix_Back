@@ -2,19 +2,40 @@ const { query } = require("../../db");
 const emailService = require("./EmailService");
 
 class DocumentManagementService {
-  async getPropertiesInReview() {
-    const sql = `
+  async getPropertiesInReview(user) {
+    let sql = `
       SELECT 
         i.*,
         a.nombre as agente_nombre,
-        a.apellido as agente_apellido
+        a.apellido as agente_apellido,
+        a.idgrupo as agente_idgrupo,
+        g.nombre as grupo_nombre,
+        g.idlider as grupo_lider
       FROM inmueble i
       LEFT JOIN agente a ON i.idagente = a.idagente
+      LEFT JOIN grupo g ON a.idgrupo = g.idgrupo
       WHERE i.estado = 'en revisión'
-      ORDER BY i.fecha_creacion DESC
     `;
     
-    const result = await query(sql);
+    const params = [];
+    
+    switch (user.rol) {
+      case 'moderador':
+        sql += ` AND a.idgrupo IS NULL`;
+        break;
+            
+      case 'team_leader':
+        sql += ` AND g.idlider = $1`;
+        params.push(user.idagente);
+        break;
+            
+      default:
+        break;
+    }
+    
+    sql += ` ORDER BY i.fecha_creacion DESC`;
+    
+    const result = await query(sql, params);
     
     return result.rows.map(property => ({
       ...property,

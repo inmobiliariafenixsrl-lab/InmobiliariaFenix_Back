@@ -6,7 +6,7 @@ const { authenticate, authorize } = require("../middleware/loginmiddleware");
 // Todas las rutas requieren autenticación
 // Solo moderadores y administradores pueden acceder a la gestión de documentos
 router.use(authenticate);
-router.use(authorize(['moderador', 'administrador']));
+router.use(authorize(['moderador', 'administrador', 'team_leader']));
 
 // Obtener inmuebles en revisión
 router.get(
