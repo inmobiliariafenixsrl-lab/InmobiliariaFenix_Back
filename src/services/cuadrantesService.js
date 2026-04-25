@@ -23,6 +23,7 @@ class CuadrantesService {
         points: cuadrante.points || [],
         description: cuadrante.description || '',
         price: parseFloat(cuadrante.price),
+        precio_construccion: parseFloat(cuadrante.precio_construccion),
         color: this.generateColorFromId(cuadrante.id)
       }));
       
