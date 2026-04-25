@@ -157,6 +157,7 @@ class CuadrantesService {
           FROM inmueble
           WHERE 
             operacion = 'venta'
+            AND estado = 'vendido'
             AND longitud IS NOT NULL 
             AND latitud IS NOT NULL
             AND ST_Contains(
@@ -326,35 +327,88 @@ class CuadrantesService {
     return colors[id % colors.length];
   }
 
-  async recalcularPreciosTodosCuadrantes() {
+  async recalcularTodosCuadrantes() {
     try {
-      const cuadrantesQuery = 'SELECT idcuadrante, puntos FROM Cuadrante';
-      const cuadrantesResult = await query(cuadrantesQuery);
+      const updateQuery = `
+        WITH cuadrantes_data AS (
+          SELECT 
+            idcuadrante,
+            puntos
+          FROM Cuadrante
+        ),
+        inmuebles_por_cuadrante AS (
+          SELECT 
+            cd.idcuadrante,
+            i.m2_terreno,
+            i.m2_construccion,
+            i.precio_capatacion_s,
+            i.precio_capatacion_m,
+            i.tipo_propiedad,
+            -- Precio por m² de terreno
+            CASE 
+              WHEN i.m2_terreno > 0 AND i.precio_capatacion_s > 0 
+              THEN i.precio_capatacion_s / i.m2_terreno
+              WHEN i.m2_terreno > 0 AND i.precio_capatacion_m > 0 
+              THEN i.precio_capatacion_m / i.m2_terreno
+              ELSE NULL
+            END as precio_m2_terreno,
+            -- Precio por m² de construcción
+            CASE 
+              WHEN m2_construccion > 20 AND precio_capatacion_s > 0 
+              THEN precio_capatacion_s / m2_construccion
+              WHEN m2_construccion > 20 AND precio_capatacion_m > 0 
+              THEN precio_capatacion_m / m2_construccion
+              ELSE NULL
+            END as precio_m2_construccion
+          FROM cuadrantes_data cd
+          CROSS JOIN inmueble i
+          WHERE 
+            i.estado = 'vendido'
+            AND i.operacion = 'venta'
+            AND i.longitud IS NOT NULL 
+            AND i.latitud IS NOT NULL
+            AND ST_Contains(
+              ST_GeomFromGeoJSON(cd.puntos::text),
+              ST_SetSRID(ST_MakePoint(i.longitud, i.latitud), 4326)
+            )
+        ),
+        promedios_calculados AS (
+          SELECT 
+            idcuadrante,
+            COALESCE(ROUND(AVG(precio_m2_terreno)), 0) as precio_terreno_promedio,
+            COALESCE(ROUND(AVG(precio_m2_construccion)), 0) as precio_construccion_promedio
+          FROM inmuebles_por_cuadrante
+          GROUP BY idcuadrante
+        )
+        UPDATE Cuadrante c
+        SET 
+          precio = COALESCE(pc.precio_terreno_promedio, 0),
+          precio_construccion = COALESCE(pc.precio_construccion_promedio, 0)
+        FROM promedios_calculados pc
+        WHERE c.idcuadrante = pc.idcuadrante
+        RETURNING c.idcuadrante, c.precio, c.precio_construccion
+      `;
       
-      for (const cuadrante of cuadrantesResult.rows) {
-        const preciosCalculados = await this.calcularPreciosPromedioCuadrante(cuadrante.puntos);
-        
-        const updateQuery = `
-          UPDATE Cuadrante 
-          SET precio = $1, precio_construccion = $2
-          WHERE idcuadrante = $3
-        `;
-        
-        await query(updateQuery, [
-          preciosCalculados.precioTerreno,
-          preciosCalculados.precioConstruccion,
-          cuadrante.idcuadrante
-        ]);
-      }
+      const result = await query(updateQuery);
+      
+      const resetQuery = `
+        UPDATE Cuadrante
+        SET precio = 0, precio_construccion = 0
+        WHERE idcuadrante NOT IN (
+          SELECT DISTINCT idcuadrante 
+          FROM (${updateQuery.split('RETURNING')[0]}) AS subq
+        )
+      `;
+      
+      await query(resetQuery);
       
       return {
-        success: true,
-        message: `Se actualizaron ${cuadrantesResult.rows.length} cuadrantes`,
-        totalCuadrantes: cuadrantesResult.rows.length
+        actualizados: result.rows.length,
+        detalles: result.rows
       };
       
     } catch (error) {
-      throw new Error(`Error al recalcular precios: ${error.message}`);
+      throw new Error(`Error al recalcular cuadrantes: ${error.message}`);
     }
   }
 }
