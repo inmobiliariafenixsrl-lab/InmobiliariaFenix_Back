@@ -1,4 +1,5 @@
 const { query } = require("../../db");
+const sharp = require('sharp');
 
 // Funciones de validación
 const validatePropertyType = (tipoPropiedad) => {
@@ -708,6 +709,45 @@ const getAllUbications = async () => {
   }
 };
 
+const compressImage = async (buffer, originalName) => {
+  try {
+    const compressionOptions = {
+      quality: 70,
+    };
+    
+    let image = sharp(buffer);
+    
+    const metadata = await image.metadata();
+    
+    let compressedBuffer;
+    if (metadata.format === 'jpeg' || metadata.format === 'jpg') {
+      compressedBuffer = await image
+        .jpeg({ quality: compressionOptions.quality, mozjpeg: true })
+        .toBuffer();
+    } else if (metadata.format === 'png') {
+      compressedBuffer = await image
+        .png({ quality: compressionOptions.quality, compressionLevel: 9 })
+        .toBuffer();
+    } else if (metadata.format === 'webp') {
+      compressedBuffer = await image
+        .webp({ quality: compressionOptions.quality })
+        .toBuffer();
+    } else {
+      compressedBuffer = await image
+        .jpeg({ quality: compressionOptions.quality })
+        .toBuffer();
+    }
+    
+    console.log(`Imagen comprimida: ${originalName} - ${(buffer.length / 1024).toFixed(2)}KB → ${(compressedBuffer.length / 1024).toFixed(2)}KB`);
+    
+    return compressedBuffer;
+  } catch (error) {
+    console.error(`Error comprimiendo imagen ${originalName}:`, error);
+    // Si falla la compresión, devolver el buffer original
+    return buffer;
+  }
+};
+
 const uploadMedia = async (propertyId, imageFiles, videoUrl) => {
   try {
     await query('BEGIN');
@@ -718,13 +758,24 @@ const uploadMedia = async (propertyId, imageFiles, videoUrl) => {
     };
     
     if (imageFiles && imageFiles.length > 0) {
-      const valueSets = imageFiles.map((_, index) => {
+      // Comprimir todas las imágenes en paralelo
+      const compressedImages = await Promise.all(
+        imageFiles.map(async (imageFile, index) => {
+          const compressedBuffer = await compressImage(imageFile.buffer, imageFile.originalname || `imagen_${index}`);
+          return {
+            ...imageFile,
+            buffer: compressedBuffer
+          };
+        })
+      );
+      
+      const valueSets = compressedImages.map((_, index) => {
         const offset = index * 4;
         return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4})`;
       });
       
       const values = [];
-      imageFiles.forEach((imageFile, index) => {
+      compressedImages.forEach((imageFile, index) => {
         values.push(
           propertyId,
           imageFile.buffer,
@@ -989,6 +1040,7 @@ module.exports = {
   getAgentesByGroup,
   getAgenteById,
   getAllUbications,
+  compressImage,
   uploadMedia,
   deleteImage,
   deleteVideo,
