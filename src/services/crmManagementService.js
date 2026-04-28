@@ -48,7 +48,7 @@ const getProperties = async (filters = {}) => {
       LEFT JOIN municipio m ON i.idmunicipio = m.idmunicipio
       LEFT JOIN provincia p ON m.idprovincia = p.idprovincia
       LEFT JOIN departamento d ON p.iddepartamento = d.iddepartamento
-      WHERE i.estado != 'eliminado'
+      WHERE i.estado = 'activo' OR i.estado = 'reservado' OR i.estado = 'vendido'
     `;
 
     const params = [];
