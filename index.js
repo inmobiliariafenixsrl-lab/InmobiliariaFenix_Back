@@ -56,6 +56,9 @@ app.use("/api/inmuebles", propertyManagementRoutes);
 const agentesRoutes = require("./src/routes/agentesRoutes");
 app.use("/api/agentes", agentesRoutes);
 
+const crmManagementRoutes = require("./src/routes/crmManagementRoutes");
+app.use("/api/crm", crmManagementRoutes);
+
 const sidebarRoutes = require("./src/routes/sidebarRoutes");
 app.use("/api/agentes", sidebarRoutes);
 
