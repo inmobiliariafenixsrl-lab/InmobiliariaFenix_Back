@@ -1,4 +1,5 @@
 const { query } = require("../../db");
+const AgenteMapper = require('../mappers/agente.mapper');
 
 const getProperties = async (filters = {}) => {
   try {
@@ -38,7 +39,7 @@ const getProperties = async (filters = {}) => {
         i.nombre_propietario,
         i.celular_propietario,
         i.idmunicipio,
-        i.porcentajeComision,
+        i.porcentajeComision as "porcentajeComision",
         i.precio_capatacion_m as "minPrice",
         i.precio_captacion_i as "idealPrice",
         i.fecha_creacion as "createdDate"
@@ -74,35 +75,11 @@ const getProperties = async (filters = {}) => {
     sql += ` ORDER BY i.fecha_creacion DESC`;
 
     const result = await query(sql, params);
-    
-    const properties = await Promise.all(result.rows.map(async (property) => {
-      const images = await getPropertyImages(property.id);
-      return { ...property, images };
-    }));
 
-    return properties;
+    return result.rows;
   } catch (error) {
     console.error("Error en getProperties:", error);
     throw error;
-  }
-};
-
-const getPropertyImages = async (propertyId) => {
-  try {
-    const result = await query(
-      `SELECT imagen FROM imagen_inmueble WHERE idinmueble = $1 ORDER BY orden ASC`,
-      [propertyId]
-    );
-    
-    return result.rows.map(row => {
-      if (row.imagen && Buffer.isBuffer(row.imagen)) {
-        return `data:image/jpeg;base64,${row.imagen.toString('base64')}`;
-      }
-      return null;
-    }).filter(img => img !== null);
-  } catch (error) {
-    console.error("Error en getPropertyImages:", error);
-    return [];
   }
 };
 
@@ -164,16 +141,14 @@ const getPropertyById = async (id) => {
 
     const property = result.rows[0];
     
-    const [images, priceChanges, offers, timeline] = await Promise.all([
-      getPropertyImages(id),
+    const [priceChanges, offers] = await Promise.all([
       getPriceChangesByProperty(id),
       getOffersByProperty(id),
-      getTimelineByProperty(id)
     ]);
+		const timeline = await getTimelineByProperty(id, priceChanges, offers);
 
     return {
       ...property,
-      images,
       priceChanges,
       offers,
       timeline
@@ -299,12 +274,12 @@ const getOffersByProperty = async (propertyId) => {
       `
       SELECT 
         idoferta as id,
-        idinmueble as propertyId,
+        idinmueble as "propertyId",
         fecha_oferta as date,
         monto_oferta as amount,
-        nombre_ofertante as offeredBy,
+        nombre_ofertante as "offeredBy",
         celular_ofertante as phone,
-        monto_seña as depositAmount
+        monto_seña as "depositAmount"
       FROM oferta_inmueble 
       WHERE idinmueble = $1
       ORDER BY fecha_oferta DESC
@@ -317,10 +292,6 @@ const getOffersByProperty = async (propertyId) => {
     console.error("Error en getOffersByProperty:", error);
     return [];
   }
-};
-
-const getOffers = async (propertyId) => {
-  return getOffersByProperty(propertyId);
 };
 
 const createOffer = async (offerData) => {
@@ -397,11 +368,11 @@ const getPriceChangesByProperty = async (propertyId) => {
       `
       SELECT 
         idhistorial as id,
-        idinmueble as propertyId,
+        idinmueble as "propertyId",
         fecha_cambio as date,
-        precio_anterior as previousPrice,
-        precio_nuevo as newPrice,
-        a.nombre || ' ' || a.apellido as changedBy
+        precio_anterior as "previousPrice",
+        precio_nuevo as "newPrice",
+        a.nombre || ' ' || a.apellido as "changedBy"
       FROM historial_precio_inmueble hpi
       LEFT JOIN agente a ON hpi.idagente_modificador = a.idagente
       WHERE idinmueble = $1
@@ -417,16 +388,12 @@ const getPriceChangesByProperty = async (propertyId) => {
   }
 };
 
-const getPriceChanges = async (propertyId) => {
-  return getPriceChangesByProperty(propertyId);
-};
-
-const getTimelineByProperty = async (propertyId) => {
+const getTimelineByProperty = async (propertyId, priceChanges, offers) => {
   try {
     const timeline = [];
 
     const propertyResult = await query(
-      `SELECT fecha_creacion as date, titulo as title, idagente as agentId
+      `SELECT fecha_creacion as date, titulo as title, idagente as "agentId"
        FROM inmueble WHERE idinmueble = $1`,
       [propertyId]
     );
@@ -444,7 +411,6 @@ const getTimelineByProperty = async (propertyId) => {
       });
     }
 
-    const priceChanges = await getPriceChangesByProperty(propertyId);
     priceChanges.forEach(pc => {
       timeline.push({
         id: `price-${pc.id}`,
@@ -457,7 +423,6 @@ const getTimelineByProperty = async (propertyId) => {
       });
     });
 
-    const offers = await getOffersByProperty(propertyId);
     offers.forEach(offer => {
       timeline.push({
         id: `offer-${offer.id}`,
@@ -465,8 +430,7 @@ const getTimelineByProperty = async (propertyId) => {
         date: offer.date,
         type: "oferta",
         title: "Nueva oferta",
-        description: `Oferta de ${offer.amount} por ${offer.offeredBy}`,
-        by: "Sistema"
+        description: `Oferta de ${offer.amount} por ${offer.offeredBy}`
       });
     });
 
@@ -476,93 +440,6 @@ const getTimelineByProperty = async (propertyId) => {
   } catch (error) {
     console.error("Error en getTimelineByProperty:", error);
     return [];
-  }
-};
-
-const getTimeline = async (propertyId) => {
-  return getTimelineByProperty(propertyId);
-};
-
-const addTimelineEvent = async (eventData) => {
-  try {
-    const { propertyId, type, title, description, by, agentName, agentPhone } = eventData;
-    
-    return {
-      id: `event-${Date.now()}`,
-      propertyId,
-      date: new Date().toISOString(),
-      type,
-      title,
-      description,
-      by,
-      agentName,
-      agentPhone
-    };
-  } catch (error) {
-    console.error("Error en addTimelineEvent:", error);
-    throw error;
-  }
-};
-
-const getAgents = async (filters = {}) => {
-  try {
-    let sql = `
-      SELECT 
-        a.idagente as id,
-        a.nombre as name,
-        a.apellido as lastName,
-        a.email,
-        a.telefono as phone,
-        a.ci,
-        a.direccion as address,
-        a.especializacion as specialization,
-        a.rol as role,
-        a.estado,
-        a.fecha_creacion as joinDate,
-        a.idgrupo as groupId,
-        g.nombre as groupName,
-        a.porcentajeComision,
-        (
-          SELECT COUNT(*) 
-          FROM inmueble 
-          WHERE idagente = a.idagente 
-          AND estado != 'eliminado'
-        ) as propertiesCount
-      FROM agente a
-      LEFT JOIN grupo g ON a.idgrupo = g.idgrupo
-      WHERE a.estado != 'eliminado'
-    `;
-
-    const params = [];
-    let paramIndex = 1;
-
-    if (filters.searchTerm) {
-      sql += ` AND (a.nombre ILIKE $${paramIndex} OR a.apellido ILIKE $${paramIndex} OR a.email ILIKE $${paramIndex})`;
-      params.push(`%${filters.searchTerm}%`);
-      paramIndex++;
-    }
-
-    if (filters.sinGrupo === true) {
-      sql += ` AND a.idgrupo IS NULL`;
-    }
-
-    if (filters.teamLeaderSinGrupo === true) {
-      sql += ` AND a.rol = 'team_leader' AND a.idgrupo IS NULL`;
-    }
-
-    sql += ` ORDER BY a.nombre ASC`;
-
-    const result = await query(sql, params);
-    
-    const agents = await Promise.all(result.rows.map(async (agent) => {
-      const socialNetworks = await getAgentSocialNetworks(agent.id);
-      return { ...agent, redesSociales: socialNetworks };
-    }));
-
-    return agents;
-  } catch (error) {
-    console.error("Error en getAgents:", error);
-    throw error;
   }
 };
 
@@ -644,48 +521,12 @@ const getAgentById = async (id) => {
   }
 };
 
-const getFullCRMData = async () => {
-  try {
-    const [properties, agents] = await Promise.all([
-      getProperties(),
-      getAgents()
-    ]);
-
-    const priceChanges = {};
-    const offers = {};
-    const timeline = {};
-
-    for (const property of properties) {
-      priceChanges[property.id] = await getPriceChangesByProperty(property.id);
-      offers[property.id] = await getOffersByProperty(property.id);
-      timeline[property.id] = await getTimelineByProperty(property.id);
-    }
-
-    return {
-      properties,
-      agents,
-      priceChanges,
-      offers,
-      timeline
-    };
-  } catch (error) {
-    console.error("Error en getFullCRMData:", error);
-    throw error;
-  }
-};
-
 module.exports = {
   getProperties,
   getPropertyById,
   updateProperty,
   updatePropertyPrice,
-  getOffers,
   createOffer,
   updateOfferStatus,
-  getPriceChanges,
-  getTimeline,
-  addTimelineEvent,
-  getAgents,
   getAgentById,
-  getFullCRMData
 };
