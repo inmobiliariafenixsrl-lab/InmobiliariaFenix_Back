@@ -1,5 +1,8 @@
 const { query } = require("../../db");
 const bcrypt = require("bcrypt");
+const agenteRepository = require('../repositories/agente.repository');
+const AgenteMapper = require('../mappers/agente.mapper');
+const { AgenteCreateDTO } = require('../dtos/agente.dto');
 
 const getAllAgentes = async (user, filters = {}) => {
   try {
@@ -115,499 +118,214 @@ const getAllAgentes = async (user, filters = {}) => {
   }
 };
 
-const getAgenteById = async (id) => {
-  try {
-    const result = await query(
-      `SELECT 
-        a.idAgente as id,
-        a.nombre as name,
-        a.apellido as "lastName",
-        a.email,
-        a.telefono as phone,
-        a.ci,
-        a.direccion as address,
-        a.especializacion as specialization,
-        a.rol as role,
-        a.estado,
-        a.fecha_creacion as "joinDate",
-        a.idgrupo as "groupId",
-        g.nombre as "groupName",
-        a.porcentajeComision as "porcentajeComision"
-      FROM agente a
-      LEFT JOIN grupo g ON a.idgrupo = g.idgrupo
-      WHERE a.idAgente = $1 AND a.estado != 'eliminado'`,
-      [id]
-    );
+  const getAgenteById = async (id) => {
+    const dbAgente = await agenteRepository.findById(id);
+    if (!dbAgente) return null;
     
-    if (result.rows.length === 0) {
-      return null;
-    }
-    
-    const agente = result.rows[0];
-    
-    const socialMediaResult = await query(
-      `SELECT 
-        tsr.nombre as type,
-        rsa.url,
-        rsa.otro_nombre as "customName"
-      FROM red_social_agente rsa
-      JOIN tipo_red_social tsr ON rsa.idtipo_red_social = tsr.idtipo_red_social
-      WHERE rsa.idagente = $1`,
-      [id]
-    );
-    
-    const socialMedia = {};
-    socialMediaResult.rows.forEach(sm => {
-      const type = sm.type.toLowerCase();
-      if (type === 'facebook') {
-        socialMedia.facebook = sm.url;
-      } else if (type === 'instagram') {
-        socialMedia.instagram = sm.url;
-      } else if (type === 'tiktok') {
-        socialMedia.tiktok = sm.url;
-      } else if (type === 'youtube') {
-        socialMedia.youtube = sm.url;
-      } else if (type === 'otro' && sm.customName) {
-        socialMedia[sm.customName.toLowerCase()] = sm.url;
-      }
-    });
-    
-    const date = Date.now();
-    
-    return {
-      id: agente.id,
-      name: agente.name,
-      lastName: agente.lastName,
-      email: agente.email,
-      phone: agente.phone,
-      ci: agente.ci,
-      address: agente.address,
-      specialization: agente.specialization,
-      role: agente.role,
-      estado: agente.estado,
-      groupId: agente.groupId,
-      groupName: agente.groupName,
-      porcentajeComision: agente.porcentajeComision,
-      facebook: socialMedia.facebook || null,
-      instagram: socialMedia.instagram || null,
-      tiktok: socialMedia.tiktok || null,
-      youtube: socialMedia.youtube || null,
-      photo: `/agentes/photo/${agente.id}?t=${date}`,
-      active: agente.estado === 'activo',
-      joinDate: agente.joinDate ? new Date(agente.joinDate).toISOString().split('T')[0] : null,
-    };
-  } catch (error) {
-    console.error("Error en getAgenteById:", error);
-    throw error;
+    const redesSociales = await agenteRepository.findSocialNetworksByAgenteId(id);
+    return AgenteMapper.toResponseDTO(dbAgente, redesSociales);
   }
-};
 
-const createAgente = async (agenteData, user) => {
-  try {
-    let {
-      name,
-      lastName,
-      email,
-      phone,
-      ci,
-      address,
-      photo,
-      specialization,
-      role,
-      groupId,
-      password,
-      facebook,
-      instagram,
-      tiktok,
-      youtube,
-      porcentajeComision
-    } = agenteData;
+  const createAgente = async (agenteData, user) => {
+    const createDTO = new AgenteCreateDTO(agenteData);
     
-    if(user.rol === 'team_leader'){
-        groupId = user.idgrupo
+    if (user.rol === 'team_leader') {
+      createDTO.groupId = user.idgrupo;
     }
-
-    if (groupId){
-      const countAgents = await query(
-      `SELECT COUNT(*) as total_agentes
-        FROM Agente
-        WHERE idgrupo = $1
-          AND estado != 'eliminado'`,
-      [groupId]
-      );
-      if (countAgents.rows[0].total_agentes >= 10){
+    
+    if (createDTO.groupId) {
+      const count = await agenteRepository.countAgentsInGroup(createDTO.groupId);
+      if (count >= 10) {
         return { error: 'LIMIT_REACHED' };
       }
     }
     
-    if (email) {
-      const emailExists = await query(
-        `SELECT idAgente FROM Agente WHERE email = $1`,
-        [email]
-      );
-      if (emailExists.rows.length > 0) {
-        return { error: 'EMAIL_EXISTS' };
-      }
+    if (createDTO.email && await agenteRepository.checkEmailExists(createDTO.email)) {
+      return { error: 'EMAIL_EXISTS' };
     }
     
-    if (ci) {
-      const ciExists = await query(
-        `SELECT idAgente FROM Agente WHERE ci = $1`,
-        [ci]
-      );
-      if (ciExists.rows.length > 0) {
-        return { error: 'CI_EXISTS' };
-      }
+    if (createDTO.ci && await agenteRepository.checkCiExists(createDTO.ci)) {
+      return { error: 'CI_EXISTS' };
     }
     
-    let hashedPassword = null;
-    if (password) {
-      hashedPassword = await bcrypt.hash(password, 10);
-    } else {
-      hashedPassword = await bcrypt.hash(ci, 10);
-    }
+    const hashedPassword = await bcrypt.hash(
+      createDTO.password || createDTO.ci, 
+      10
+    );
     
-    const estado = 'activo';
+    const dbAgenteData = AgenteMapper.toDBCreate(createDTO, hashedPassword);
+    
+    let photoBuffer = null;
+    if (agenteData.photo) {
+      const base64Data = agenteData.photo.includes(',') 
+        ? agenteData.photo.split(',')[1] 
+        : agenteData.photo;
+      photoBuffer = Buffer.from(base64Data, 'base64');
+    }
     
     await query('BEGIN');
-    
     try {
-      const result = await query(
-        `INSERT INTO agente (
-          nombre, apellido, email, telefono, ci, direccion, 
-          foto, especializacion, rol, estado, idgrupo, contrasenia,
-          porcentajecomision
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-        RETURNING 
-          idAgente as id,
-          nombre as name,
-          apellido as "lastName",
-          email,
-          telefono as phone,
-          ci,
-          direccion as address,
-          foto as photo,
-          especializacion as specialization,
-          rol as role,
-          estado,
-          fecha_creacion as "joinDate",
-          idgrupo as "groupId"`,
-        [
-          name, lastName, email, phone, ci, address,
-          photo ? Buffer.from(photo.split(',')[1], 'base64') : null,
-          specialization, role, estado, groupId || null, hashedPassword,
-          porcentajeComision ? porcentajeComision : 1
-        ]
-      );
+      const nuevoAgente = await agenteRepository.create(dbAgenteData, hashedPassword, photoBuffer);
       
-      const nuevoAgente = result.rows[0];
-      const agenteId = nuevoAgente.id;
-      
-      const socialNetworks = [
-        { type: 'Facebook', url: facebook },
-        { type: 'Instagram', url: instagram },
-        { type: 'Tiktok', url: tiktok },
-        { type: 'Youtube', url: youtube }
-      ];
-      
+      const socialNetworks = AgenteMapper.extractSocialNetworksFromPayload(agenteData);
       for (const social of socialNetworks) {
-        if (social.url) {
-          const tipoResult = await query(
-            `SELECT idtipo_red_social FROM tipo_red_social WHERE nombre = $1`,
-            [social.type]
+        let tipoId = await agenteRepository.findSocialNetworkTypeId(social.type);
+        
+        if (tipoId) {
+          await agenteRepository.addSocialNetwork(
+            nuevoAgente.id, 
+            tipoId, 
+            social.url,
+            social.isCustom ? social.type : null
           );
-          
-          if (tipoResult.rows.length > 0) {
-            await query(
-              `INSERT INTO red_social_agente (idagente, idtipo_red_social, url)
-               VALUES ($1, $2, $3)`,
-              [agenteId, tipoResult.rows[0].idtipo_red_social, social.url]
-            );
-          }
         }
       }
       
       await query('COMMIT');
       
-      return {
-        ...nuevoAgente,
-        active: nuevoAgente.estado === 'activo',
-        joinDate: nuevoAgente.joinDate ? new Date(nuevoAgente.joinDate).toISOString().split('T')[0] : null,
-        propertiesCount: 0,
-        capturedProperties: [],
-        photo: nuevoAgente.photo 
-          ? `/agentes/photo/${nuevoAgente.id}?t=${Date.now()}`
-          : null,
-        facebook: facebook || null,
-        instagram: instagram || null,
-        tiktok: tiktok || null,
-        youtube: youtube || null
-      };
+      return await getAgenteById(nuevoAgente.id);
+      
     } catch (error) {
       await query('ROLLBACK');
       throw error;
     }
-  } catch (error) {
-    console.error("Error en createAgente:", error);
-    
-    if (error.code === '23505') {
-      if (error.constraint === 'agente_email_unique') {
-        return { error: 'EMAIL_EXISTS' };
-      }
-      if (error.constraint === 'agente_ci_unique') {
-        return { error: 'CI_EXISTS' };
-      }
-    }
-    
-    throw error;
   }
-};
 
-const updateAgente = async (id, agenteData, user) => {
-  try {
-    const {
-      name,
-      lastName,
-      email,
-      phone,
-      ci,
-      address,
-      photo,
-      specialization,
-      role,
-      groupId: groupIdRaw,
-      active,
-      facebook,
-      instagram,
-      tiktok,
-      youtube,
-      porcentajeComision
-    } = agenteData;
-    const groupId = groupIdRaw ? Number(groupIdRaw) : null;
-
-    const currentAgente = await query(
-      'SELECT * FROM Agente WHERE idAgente = $1 AND estado != $2',
-      [id, 'eliminado']
-    );
+  const updateAgente = async (id, agenteData, user) => {
+    const currentAgente = await agenteRepository.findCurrentAgente(id);
+    if (!currentAgente) return null;
     
-    if (currentAgente.rows.length === 0) {
+    if (user.rol === 'team_leader' && 
+        currentAgente.idgrupo && 
+        currentAgente.idgrupo !== user.idgrupo) {
       return null;
     }
-
-    const agenteActual = currentAgente.rows[0];
     
-    if (user.rol === 'team_leader' && agenteActual.idgrupo !== null && agenteActual.idgrupo !== user.idgrupo) {
-      return null;
-    }
-
-    if (email !== undefined && email !== agenteActual.email) {
-      const emailExists = await query(
-        `SELECT idAgente FROM Agente WHERE email = $1 AND idAgente != $2`,
-        [email, id]
-      );
-      if (emailExists.rows.length > 0) {
+    if (agenteData.email && agenteData.email !== currentAgente.email) {
+      if (await agenteRepository.checkEmailExists(agenteData.email, id)) {
         return { error: 'EMAIL_EXISTS' };
       }
     }
-
-    if (ci !== undefined && ci !== agenteActual.ci) {
-      const ciExists = await query(
-        `SELECT idAgente FROM Agente WHERE ci = $1 AND idAgente != $2`,
-        [ci, id]
-      );
-      if (ciExists.rows.length > 0) {
+    
+    if (agenteData.ci && agenteData.ci !== currentAgente.ci) {
+      if (await agenteRepository.checkCiExists(agenteData.ci, id)) {
         return { error: 'CI_EXISTS' };
       }
     }
-
-    const isChangingRole = role !== undefined && role !== agenteActual.rol;
-    const isBecomingAdminOrModerator = isChangingRole && ['administrador', 'moderador'].includes(role);
-    const isLeavingTeamLeader = isChangingRole && agenteActual.rol === 'team_leader';
-    const isBecomingTeamLeader = isChangingRole && role === 'team_leader';
+    
+    const isChangingRole = agenteData.role && agenteData.role !== currentAgente.rol;
+    const isBecomingAdminOrModerator = isChangingRole && 
+      ['administrador', 'moderador'].includes(agenteData.role);
+    const isLeavingTeamLeader = isChangingRole && currentAgente.rol === 'team_leader';
     
     let forceGroupIdNull = false;
-
-    if (isBecomingAdminOrModerator || isLeavingTeamLeader || isBecomingTeamLeader) {
-      if (agenteActual.idgrupo) {
-        if (agenteActual.rol === 'team_leader') {
-          await updateGrupo(agenteActual.idgrupo.toString(), { leaderId: null });
-        }
-        forceGroupIdNull = true;
+    if (isBecomingAdminOrModerator || isLeavingTeamLeader) {
+      if (currentAgente.idgrupo && currentAgente.rol === 'team_leader') {
+        await updateGrupo(currentAgente.idgrupo.toString(), { leaderId: null });
       }
+      forceGroupIdNull = true;
+      agenteData.groupId = null;
     }
-    if (!forceGroupIdNull && groupId !== null && groupId !== undefined && groupId !== agenteActual.idgrupo) {
-      const countAgents = await query(
-        `SELECT COUNT(*) as total_agentes
-         FROM Agente
-         WHERE idgrupo = $1 AND estado != 'eliminado'`,
-        [groupId]
-      );
-      
-      if (parseInt(countAgents.rows[0].total_agentes) >= 10) {
+    
+    if (!forceGroupIdNull && 
+        agenteData.groupId && 
+        agenteData.groupId !== currentAgente.idgrupo) {
+      const count = await agenteRepository.countAgentsInGroup(agenteData.groupId);
+      if (count >= 10) {
         return { error: 'LIMIT_REACHED' };
       }
     }
-
-    const isTeamLeader = agenteActual.rol === 'team_leader';
-    const isChangingGroup = groupId !== undefined && groupId !== agenteActual.idgrupo;
+    
+    const isTeamLeader = currentAgente.rol === 'team_leader';
+    const isChangingGroup = agenteData.groupId !== undefined && 
+                           agenteData.groupId !== currentAgente.idgrupo;
     
     if (isTeamLeader && isChangingGroup && !isChangingRole) {
-      if (agenteActual.idgrupo) {
-        await updateGrupo(agenteActual.idgrupo.toString(), { leaderId: null });
+      if (currentAgente.idgrupo) {
+        await updateGrupo(currentAgente.idgrupo.toString(), { leaderId: null });
       }
       
-      if (groupId && groupId !== null) {
+      if (agenteData.groupId) {
         const grupoNuevo = await query(
           'SELECT idlider FROM Grupo WHERE idgrupo = $1',
-          [groupId]
+          [agenteData.groupId]
         );
         
-        if (grupoNuevo.rows.length > 0) {
-          if (grupoNuevo.rows[0].idlider) {
-            return { error: 'GRUPO_OCUPADO'};
-          }
-          await updateGrupo(groupId.toString(), { leaderId: id });
+        if (grupoNuevo.rows[0]?.idlider) {
+          return { error: 'GRUPO_OCUPADO' };
         }
+        await updateGrupo(agenteData.groupId.toString(), { leaderId: id });
       }
     }
-
-    await query('BEGIN');
     
+    const dbUpdate = AgenteMapper.toDBUpdate(agenteData);
+    if (forceGroupIdNull) dbUpdate.idgrupo = null;
+    
+    await query('BEGIN');
     try {
-      const updates = [];
-      const values = [];
-      let paramIndex = 1;
-      
-      if (name !== undefined) {
-        updates.push(`nombre = $${paramIndex++}`);
-        values.push(name);
-      }
-      if (lastName !== undefined) {
-        updates.push(`apellido = $${paramIndex++}`);
-        values.push(lastName);
-      }
-      if (email !== undefined) {
-        updates.push(`email = $${paramIndex++}`);
-        values.push(email);
-      }
-      if (phone !== undefined) {
-        updates.push(`telefono = $${paramIndex++}`);
-        values.push(phone);
-      }
-      if (ci !== undefined) {
-        updates.push(`ci = $${paramIndex++}`);
-        values.push(ci);
-      }
-      if (address !== undefined) {
-        updates.push(`direccion = $${paramIndex++}`);
-        values.push(address);
-      }
-      
-      if (photo !== undefined) {
-        if (photo === null || photo === '') {
-          updates.push(`foto = NULL`);
-        } else {
-          updates.push(`foto = $${paramIndex++}`);
-          const base64Data = photo.includes(',') ? photo.split(',')[1] : photo;
-          values.push(Buffer.from(base64Data, 'base64'));
-        }
-      }
-      
-      if (specialization !== undefined) {
-        updates.push(`especializacion = $${paramIndex++}`);
-        values.push(specialization);
-      }
-      if (role !== undefined) {
-        updates.push(`rol = $${paramIndex++}`);
-        values.push(role);
-      }
-      
-      if (forceGroupIdNull) {
-        updates.push(`idgrupo = NULL`);
-      } else if (groupId !== undefined) {
-        updates.push(`idgrupo = $${paramIndex++}`);
-        values.push(groupId || null);
-      }
-      
-      if (active !== undefined) {
-        const estado = active === false ? 'inactivo' : 'activo';
-        updates.push(`estado = $${paramIndex++}`);
-        values.push(estado);
+      if (Object.keys(dbUpdate).length > 0) {
+        await agenteRepository.updateAgente(id, dbUpdate);
       }
 
-      if (porcentajeComision !== undefined) {
-        updates.push(`porcentajecomision = $${paramIndex++}`);
-        values.push(porcentajeComision);
-      }
+      const currentSocialNetworks = await agenteRepository.getAllSocialNetworksByAgenteId(id);
       
-      if (updates.length > 0) {
-        values.push(id);
+      const newSocialNetworks = AgenteMapper.extractSocialNetworksFromPayload(agenteData);
+
+      const currentSocialMap = new Map();
+      
+      currentSocialNetworks.forEach(social => {
+        const key = social.type.toLowerCase() === 'otro' && social.customName
+          ? `otro:${social.customName}`
+          : social.type;
+        currentSocialMap.set(key, social);
+      });
+
+      for (const newSocial of newSocialNetworks) {
+        const isOtro = newSocial.isCustom;
         
-        await query(
-          `UPDATE Agente 
-           SET ${updates.join(', ')} 
-           WHERE idAgente = $${paramIndex} AND estado != 'eliminado'`,
-          values
-        );
-      }
-      
-      const socialNetworks = [
-        { type: 'Facebook', url: facebook },
-        { type: 'Instagram', url: instagram },
-        { type: 'Tiktok', url: tiktok },
-        { type: 'Youtube', url: youtube }
-      ];
-      
-      for (const social of socialNetworks) {
-        if (social.url !== undefined) {
-          await query(
-            `DELETE FROM red_social_agente 
-             WHERE idagente = $1 AND idtipo_red_social = (
-               SELECT idtipo_red_social FROM tipo_red_social WHERE nombre = $2
-             )`,
-            [id, social.type]
-          );
-          
-          if (social.url && social.url.trim() !== '') {
-            const tipoResult = await query(
-              `SELECT idtipo_red_social FROM tipo_red_social WHERE nombre = $1`,
-              [social.type]
-            );
-            
-            if (tipoResult.rows.length > 0) {
-              await query(
-                `INSERT INTO red_social_agente (idagente, idtipo_red_social, url)
-                 VALUES ($1, $2, $3)`,
-                [id, tipoResult.rows[0].idtipo_red_social, social.url]
-              );
+        const tipoId = await agenteRepository.findSocialNetworkTypeId(newSocial.type);
+        if (!tipoId) {
+          console.warn(`Tipo de red social no encontrado: ${newSocial.type}`);
+          continue;
+        }
+        const key = newSocial.type;
+        
+        const existingSocial = currentSocialMap.get(key);
+        
+        if (existingSocial) {
+          if (existingSocial.url !== newSocial.url) {
+            if (isOtro) {
+              await agenteRepository.deleteSpecificSocialNetwork(id, tipoId, newSocial.name);
+            } else {
+              await agenteRepository.deleteSocialNetworksByType(id, tipoId);
             }
+            await agenteRepository.addSocialNetwork(
+              id, 
+              tipoId, 
+              newSocial.url, 
+              isOtro ? newSocial.name : null
+            );
           }
+          currentSocialMap.delete(key);
+        } else {
+          await agenteRepository.addSocialNetwork(
+            id, 
+            tipoId, 
+            newSocial.url, 
+            isOtro ? newSocial.name : null
+          );
         }
       }
       
       await query('COMMIT');
       
-      const agenteActualizado = await getAgenteById(id);
-      return agenteActualizado;
+      return await getAgenteById(id);
       
     } catch (error) {
       await query('ROLLBACK');
       throw error;
     }
-  } catch (error) {
-    console.error("Error en updateAgente:", error);
-    if (error.code === '23505') {
-      if (error.constraint === 'agente_email_unique') {
-        return { error: 'EMAIL_EXISTS' };
-      }
-      if (error.constraint === 'agente_ci_unique') {
-        return { error: 'CI_EXISTS' };
-      }
-    }
-    
-    throw error;
   }
-};
 
 const updateAgenteEstado = async (id, estado, user) => {
   const estadoValido = ['activo', 'inactivo', 'eliminado'].includes(estado) ? estado : 'inactivo';
