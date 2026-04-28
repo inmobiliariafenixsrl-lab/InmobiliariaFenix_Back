@@ -176,7 +176,7 @@ const getAllAgentes = async (user, filters = {}) => {
             nuevoAgente.id, 
             tipoId, 
             social.url,
-            social.isCustom ? social.type : null
+            social.isCustom ? social.name : null
           );
         }
       }

@@ -71,7 +71,6 @@ class AgenteMapper {
     return dbUpdate;
   }
 
-  // Extraer redes sociales del payload
   static extractSocialNetworksFromPayload(payload) {
     if (!payload.redesSociales || !Array.isArray(payload.redesSociales)) {
       return [];
