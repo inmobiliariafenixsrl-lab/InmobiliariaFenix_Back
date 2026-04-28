@@ -55,6 +55,13 @@ class AgenteMapper {
 
   static toDBUpdate(updateData) {
     const dbUpdate = {};
+    let photoBuffer = null;
+    if (updateData.photo) {
+      const base64Data = updateData.photo.includes(',') 
+        ? updateData.photo.split(',')[1] 
+        : updateData.photo;
+      photoBuffer = Buffer.from(base64Data, 'base64');
+    }
     
     if (updateData.name !== undefined) dbUpdate.nombre = updateData.name;
     if (updateData.lastName !== undefined) dbUpdate.apellido = updateData.lastName;
@@ -67,6 +74,7 @@ class AgenteMapper {
     if (updateData.groupId !== undefined) dbUpdate.idgrupo = updateData.groupId;
     if (updateData.porcentajeComision !== undefined) dbUpdate.porcentajecomision = updateData.porcentajeComision;
     if (updateData.active !== undefined) dbUpdate.estado = updateData.active ? 'activo' : 'inactivo';
+    if (updateData.photo !== undefined) dbUpdate.foto = photoBuffer;
     
     return dbUpdate;
   }
