@@ -150,15 +150,22 @@ const { query } = require("../../db");
     return true;
   }
 
-  const deleteSpecificSocialNetwork = async (agenteId, tipoId, customName = null) => {
-    let queryText = `DELETE FROM red_social_agente 
-                     WHERE idagente = $1 AND idtipo_red_social = $2`;
-    const params = [agenteId, tipoId];
+  const updateSocialNetwork = async (idRedSocial, newUrl, otroNombre = null) => {
+    const queryText = `
+      UPDATE red_social_agente 
+      SET url = $1, 
+          otro_nombre = $2
+      WHERE idred_social = $3
+    `;
+    const params = [newUrl, otroNombre, idRedSocial];
     
-    if (customName) {
-      queryText += ` AND otro_nombre = $3`;
-      params.push(customName);
-    }
+    await query(queryText, params);
+  }
+
+  const deleteSocialNetwork = async (idred_social) => {
+    let queryText = `DELETE FROM red_social_agente 
+                     WHERE idred_social = $1`;
+    const params = [idred_social];
     
     await query(queryText, params);
   }
@@ -196,7 +203,8 @@ module.exports = {
     addSocialNetwork,
     findSocialNetworkTypeId,
     updateAgente,
-    deleteSpecificSocialNetwork,
     findCurrentAgente,
     getAllSocialNetworksByAgenteId,
+    deleteSocialNetwork,
+    updateSocialNetwork,
 }

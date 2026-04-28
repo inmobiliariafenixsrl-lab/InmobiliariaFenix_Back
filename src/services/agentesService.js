@@ -272,11 +272,11 @@ const getAllAgentes = async (user, filters = {}) => {
       const newSocialNetworks = AgenteMapper.extractSocialNetworksFromPayload(agenteData);
 
       const currentSocialMap = new Map();
-      
+
       currentSocialNetworks.forEach(social => {
         const key = social.type.toLowerCase() === 'otro' && social.customName
-          ? `otro:${social.customName}`
-          : social.type;
+          ? `otro:${social.customName.toLowerCase()}`
+          : social.type.toLowerCase();
         currentSocialMap.set(key, social);
       });
 
@@ -288,23 +288,27 @@ const getAllAgentes = async (user, filters = {}) => {
           console.warn(`Tipo de red social no encontrado: ${newSocial.type}`);
           continue;
         }
-        const key = newSocial.type;
-        
+
+        const key = isOtro && newSocial.name
+          ? `otro:${newSocial.name.toLowerCase()}`
+          : newSocial.type.toLowerCase();
+
         const existingSocial = currentSocialMap.get(key);
         
         if (existingSocial) {
           if (existingSocial.url !== newSocial.url) {
             if (isOtro) {
-              await agenteRepository.deleteSpecificSocialNetwork(id, tipoId, newSocial.name);
+              await agenteRepository.updateSocialNetwork(
+                existingSocial.idred_social,
+                newSocial.url,
+                newSocial.name
+              );
             } else {
-              await agenteRepository.deleteSocialNetworksByType(id, tipoId);
+              await agenteRepository.updateSocialNetwork(
+                existingSocial.idred_social,
+                newSocial.url,
+              );
             }
-            await agenteRepository.addSocialNetwork(
-              id, 
-              tipoId, 
-              newSocial.url, 
-              isOtro ? newSocial.name : null
-            );
           }
           currentSocialMap.delete(key);
         } else {
@@ -314,6 +318,16 @@ const getAllAgentes = async (user, filters = {}) => {
             newSocial.url, 
             isOtro ? newSocial.name : null
           );
+        }
+      }
+
+      for (const [key, social] of currentSocialMap.entries()) {
+        const isOtro = social.type.toLowerCase() === 'otro';
+        
+        if (isOtro && social.customName) {
+          await agenteRepository.deleteSocialNetwork(social.idred_social);
+        } else {
+          await agenteRepository.deleteSocialNetwork(social.idred_social);
         }
       }
       
