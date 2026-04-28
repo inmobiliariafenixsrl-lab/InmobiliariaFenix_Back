@@ -114,26 +114,6 @@ const updatePropertyPrice = async (req, res) => {
   }
 };
 
-const getOffers = async (req, res) => {
-  try {
-    const { propertyId } = req.params;
-    
-    const offers = await crmManagementService.getOffers(propertyId);
-    
-    res.json({
-      success: true,
-      data: offers
-    });
-  } catch (error) {
-    console.error("Error en getOffers:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error interno del servidor",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined
-    });
-  }
-};
-
 const createOffer = async (req, res) => {
   try {
     const offerData = req.body;
@@ -191,119 +171,6 @@ const updateOfferStatus = async (req, res) => {
   }
 };
 
-const getPriceChanges = async (req, res) => {
-  try {
-    const { propertyId } = req.params;
-    
-    const priceChanges = await crmManagementService.getPriceChanges(propertyId);
-    
-    res.json({
-      success: true,
-      data: priceChanges
-    });
-  } catch (error) {
-    console.error("Error en getPriceChanges:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error interno del servidor",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined
-    });
-  }
-};
-
-const getTimeline = async (req, res) => {
-  try {
-    const { propertyId } = req.params;
-    
-    const timeline = await crmManagementService.getTimeline(propertyId);
-    
-    res.json({
-      success: true,
-      data: timeline
-    });
-  } catch (error) {
-    console.error("Error en getTimeline:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error interno del servidor",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined
-    });
-  }
-};
-
-const addTimelineEvent = async (req, res) => {
-  try {
-    const eventData = req.body;
-    
-    if (!eventData.propertyId || !eventData.type || !eventData.title) {
-      return res.status(400).json({
-        success: false,
-        message: "Datos incompletos: se requiere propertyId, type y title"
-      });
-    }
-    
-    const event = await crmManagementService.addTimelineEvent(eventData);
-    
-    res.status(201).json({
-      success: true,
-      message: "Evento agregado exitosamente",
-      data: event
-    });
-  } catch (error) {
-    console.error("Error en addTimelineEvent:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error interno del servidor",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined
-    });
-  }
-};
-
-const getAgents = async (req, res) => {
-  try {
-    const { searchTerm, sinGrupo, teamLeaderSinGrupo, page, limit } = req.query;
-    const filters = { 
-      searchTerm, 
-      sinGrupo: sinGrupo === 'true',
-      teamLeaderSinGrupo: teamLeaderSinGrupo === 'true'
-    };
-    
-    const agents = await crmManagementService.getAgents(filters);
-    
-    let responseData = agents;
-    let pagination = null;
-    
-    if (page && limit) {
-      const start = (parseInt(page) - 1) * parseInt(limit);
-      const end = start + parseInt(limit);
-      const paginatedAgents = agents.slice(start, end);
-      
-      pagination = {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: agents.length,
-        totalPages: Math.ceil(agents.length / parseInt(limit)),
-        hasNextPage: end < agents.length,
-        hasPrevPage: parseInt(page) > 1
-      };
-      responseData = paginatedAgents;
-    }
-    
-    res.json({
-      success: true,
-      data: responseData,
-      pagination
-    });
-  } catch (error) {
-    console.error("Error en getAgents:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error interno del servidor",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined
-    });
-  }
-};
-
 const getAgentById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -331,36 +198,12 @@ const getAgentById = async (req, res) => {
   }
 };
 
-const getFullCRMData = async (req, res) => {
-  try {
-    const crmData = await crmManagementService.getFullCRMData();
-    
-    res.json({
-      success: true,
-      data: crmData
-    });
-  } catch (error) {
-    console.error("Error en getFullCRMData:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error interno del servidor",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined
-    });
-  }
-};
-
 module.exports = {
   getProperties,
   getPropertyById,
   updateProperty,
   updatePropertyPrice,
-  getOffers,
   createOffer,
   updateOfferStatus,
-  getPriceChanges,
-  getTimeline,
-  addTimelineEvent,
-  getAgents,
   getAgentById,
-  getFullCRMData
 };
