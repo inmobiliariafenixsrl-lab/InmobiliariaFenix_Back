@@ -14,9 +14,9 @@ class CuadrantesService {
         FROM Cuadrante
         ORDER BY idcuadrante DESC
       `;
-      
+
       const result = await query(consulta);
-      
+
       const cuadrantes = result.rows.map(cuadrante => ({
         id: cuadrante.id.toString(),
         name: cuadrante.name,
@@ -26,7 +26,7 @@ class CuadrantesService {
         precio_construccion: parseFloat(cuadrante.precio_construccion),
         color: this.generateColorFromId(cuadrante.id)
       }));
-      
+
       return cuadrantes;
     } catch (error) {
       throw new Error(`Error al obtener zonas: ${error.message}`);
@@ -36,18 +36,18 @@ class CuadrantesService {
   async createCuadrante(cuadranteData) {
     try {
       await query('BEGIN');
-      
+
       const {
         name,
         points,
         description = '',
         color = this.generateColorFromId(null)
       } = cuadranteData;
-      
+
       if (!Array.isArray(points) || points.length < 3) {
         throw new Error('El polígono debe tener al menos 3 puntos');
       }
-      
+
       for (let i = 0; i < points.length; i++) {
         const point = points[i];
         if (!Array.isArray(point) || point.length !== 2) {
@@ -60,25 +60,25 @@ class CuadrantesService {
           throw new Error(`Las coordenadas del punto ${i} no pueden ser NaN`);
         }
       }
-      
+
       const insertQuery = `
         INSERT INTO Cuadrante (nombre, puntos, descripcion, precio, precio_construccion)
         VALUES ($1, $2, $3, 0, 0)
         RETURNING idcuadrante
       `;
-      
+
       const insertResult = await query(insertQuery, [
         name,
         JSON.stringify(points),
         description
       ]);
-      
+
       const cuadranteId = insertResult.rows[0].idcuadrante;
-      
+
       const preciosCalculados = await this.calcularPreciosPromedioCuadrante(
         points
       );
-      
+
       const updateQuery = `
         UPDATE Cuadrante
         SET precio = $1, precio_construccion = $2
@@ -91,17 +91,17 @@ class CuadrantesService {
           precio as price,
           precio_construccion as precio_construccion
       `;
-      
+
       const updateResult = await query(updateQuery, [
         preciosCalculados.precioTerreno,
         preciosCalculados.precioConstruccion,
         cuadranteId
       ]);
-      
+
       await query('COMMIT');
-      
+
       const newCuadrante = updateResult.rows[0];
-      
+
       return {
         id: newCuadrante.id.toString(),
         name: newCuadrante.name,
@@ -111,7 +111,7 @@ class CuadrantesService {
         precioConstruccion: parseFloat(newCuadrante.precio_construccion) || 0,
         color: color,
       };
-      
+
     } catch (error) {
       await query('ROLLBACK');
       throw new Error(`Error al crear zona: ${error.message}`);
@@ -123,10 +123,10 @@ class CuadrantesService {
       const polygonPoints = points
         .map(point => `${point[1]} ${point[0]}`) // lng lat
         .join(',');
-      
+
       const firstPoint = points[0];
       const closedPolygon = `${polygonPoints},${firstPoint[1]} ${firstPoint[0]}`;
-      
+
       const consulta = `
         WITH inmuebles_en_cuadrante AS (
           SELECT 
@@ -179,15 +179,15 @@ class CuadrantesService {
           COALESCE(MAX(precio_m2_construccion), 0) as max_construccion
         FROM inmuebles_en_cuadrante
       `;
-      
+
       const result = await query(consulta);
       const stats = result.rows[0];
-      
+
       return {
         precioTerreno: Math.round(parseFloat(stats.promedio_terreno) || 0),
         precioConstruccion: Math.round(parseFloat(stats.promedio_construccion) || 0),
       };
-      
+
     } catch (error) {
       console.error('Error en calcularPreciosPromedioCuadrante:', error);
       return {
@@ -208,13 +208,13 @@ class CuadrantesService {
     try {
       const checkQuery = 'SELECT idcuadrante, puntos FROM Cuadrante WHERE idcuadrante = $1';
       const checkResult = await query(checkQuery, [id]);
-      
+
       if (checkResult.rows.length === 0) {
         return null;
       }
-      
+
       let pointsToUse = checkResult.rows[0].puntos;
-      
+
       if (cuadranteData.points !== undefined) {
         if (!Array.isArray(cuadranteData.points) || cuadranteData.points.length < 3) {
           throw new Error('El polígono debe tener al menos 3 puntos');
@@ -234,40 +234,40 @@ class CuadrantesService {
         }
         pointsToUse = cuadranteData.points;
       }
-      
+
       const preciosCalculados = await this.calcularPreciosPromedioCuadrante(pointsToUse);
-      
+
       const updates = [];
       const values = [];
       let paramCount = 1;
-      
+
       if (cuadranteData.name !== undefined) {
         updates.push(`nombre = $${paramCount++}`);
         values.push(cuadranteData.name);
       }
-      
+
       if (cuadranteData.points !== undefined) {
         updates.push(`puntos = $${paramCount++}`);
         values.push(JSON.stringify(cuadranteData.points));
       }
-      
+
       if (cuadranteData.description !== undefined) {
         updates.push(`descripcion = $${paramCount++}`);
         values.push(cuadranteData.description);
       }
-      
+
       updates.push(`precio = $${paramCount++}`);
       values.push(preciosCalculados.precioTerreno);
-      
+
       updates.push(`precio_construccion = $${paramCount++}`);
       values.push(preciosCalculados.precioConstruccion);
-      
+
       if (updates.length === 0) {
         throw new Error('No hay datos para actualizar');
       }
-      
+
       values.push(id);
-      
+
       const consulta = `
         UPDATE Cuadrante 
         SET ${updates.join(', ')}
@@ -280,10 +280,10 @@ class CuadrantesService {
           precio as price,
           precio_construccion as precio_construccion
       `;
-      
+
       const result = await query(consulta, values);
       const updatedCuadrante = result.rows[0];
-      
+
       return {
         id: updatedCuadrante.id.toString(),
         name: updatedCuadrante.name,
@@ -298,27 +298,27 @@ class CuadrantesService {
     }
   }
 
-  async deleteCuadrante (id) {
+  async deleteCuadrante(id) {
     try {
-    const grupo = await query(
-      'SELECT * FROM cuadrante WHERE idcuadrante = $1',
-      [id]
-    );
-    
-    if (grupo.rows.length === 0) {
-      return false;
+      const grupo = await query(
+        'SELECT * FROM cuadrante WHERE idcuadrante = $1',
+        [id]
+      );
+
+      if (grupo.rows.length === 0) {
+        return false;
+      }
+
+      await query(
+        'DELETE FROM cuadrante WHERE idcuadrante = $1',
+        [id]
+      );
+
+      return true;
+    } catch (error) {
+      console.error("Error en deleteCuadrante:", error);
+      throw error;
     }
-        
-    await query(
-      'DELETE FROM cuadrante WHERE idcuadrante = $1',
-      [id]
-    );
-    
-    return true;
-  } catch (error) {
-    console.error("Error en deleteCuadrante:", error);
-    throw error;
-  }
   }
 
   generateColorFromId(id) {
@@ -327,88 +327,98 @@ class CuadrantesService {
     return colors[id % colors.length];
   }
 
-  async recalcularTodosCuadrantes() {
+  async recalcularCuadrante(propertyId) {
     try {
+      const propertyQuery = `
+              SELECT 
+                  i.latitud,
+                  i.longitud,
+                  i.idinmueble
+              FROM inmueble i
+              WHERE i.idinmueble = $1
+          `;
+
+      const propertyResult = await query(propertyQuery, [propertyId]);
+
+      if (propertyResult.rows.length === 0) {
+        throw new Error(`Propiedad con ID ${propertyId} no encontrada`);
+      }
+
+      const property = propertyResult.rows[0];
+
+      if (!property.latitud || !property.longitud) {
+        throw new Error(`La propiedad ${propertyId} no tiene coordenadas definidas`);
+      }
+
+      const findCuadranteQuery = `
+        SELECT 
+          c.idcuadrante,
+          c.nombre,
+          c.descripcion,
+          c.puntos,
+          c.precio,
+          c.precio_construccion
+        FROM cuadrante c
+        WHERE ST_Within(
+          ST_SetSRID(ST_MakePoint($1, $2), 4326),
+          ST_SetSRID(
+            ST_GeomFromGeoJSON(
+              json_build_object(
+                'type', 'Polygon',
+                'coordinates', json_build_array(c.puntos)
+              )::text
+            ), 
+            4326
+          )
+        )
+        LIMIT 1
+      `;
+
+      const cuadranteResult = await query(findCuadranteQuery, [
+        property.latitud,
+        property.longitud,
+      ]);
+
+      if (cuadranteResult.rows.length === 0) {
+        throw new Error(`No se encontró ningún cuadrante que contenga la propiedad en coordenadas (${property.latitud}, ${property.longitud})`);
+      }
+      console.log(cuadranteResult.rows[0].nombre);
+
+      const points = cuadranteResult.rows[0].puntos;
+
+      const preciosPromedio = await this.calcularPreciosPromedioCuadrante(points);
+
       const updateQuery = `
-        WITH cuadrantes_data AS (
-          SELECT 
-            idcuadrante,
-            puntos
-          FROM Cuadrante
-        ),
-        inmuebles_por_cuadrante AS (
-          SELECT 
-            cd.idcuadrante,
-            i.m2_terreno,
-            i.m2_construccion,
-            i.precio_capatacion_s,
-            i.precio_capatacion_m,
-            i.tipo_propiedad,
-            -- Precio por m² de terreno
-            CASE 
-              WHEN i.m2_terreno > 0 AND i.precio_capatacion_s > 0 
-              THEN i.precio_capatacion_s / i.m2_terreno
-              WHEN i.m2_terreno > 0 AND i.precio_capatacion_m > 0 
-              THEN i.precio_capatacion_m / i.m2_terreno
-              ELSE NULL
-            END as precio_m2_terreno,
-            -- Precio por m² de construcción
-            CASE 
-              WHEN m2_construccion > 20 AND precio_capatacion_s > 0 
-              THEN precio_capatacion_s / m2_construccion
-              WHEN m2_construccion > 20 AND precio_capatacion_m > 0 
-              THEN precio_capatacion_m / m2_construccion
-              ELSE NULL
-            END as precio_m2_construccion
-          FROM cuadrantes_data cd
-          CROSS JOIN inmueble i
-          WHERE 
-            i.estado = 'vendido'
-            AND i.operacion = 'venta'
-            AND i.longitud IS NOT NULL 
-            AND i.latitud IS NOT NULL
-            AND ST_Contains(
-              ST_GeomFromGeoJSON(cd.puntos::text),
-              ST_SetSRID(ST_MakePoint(i.longitud, i.latitud), 4326)
-            )
-        ),
-        promedios_calculados AS (
-          SELECT 
-            idcuadrante,
-            COALESCE(ROUND(AVG(precio_m2_terreno)), 0) as precio_terreno_promedio,
-            COALESCE(ROUND(AVG(precio_m2_construccion)), 0) as precio_construccion_promedio
-          FROM inmuebles_por_cuadrante
-          GROUP BY idcuadrante
-        )
-        UPDATE Cuadrante c
-        SET 
-          precio = COALESCE(pc.precio_terreno_promedio, 0),
-          precio_construccion = COALESCE(pc.precio_construccion_promedio, 0)
-        FROM promedios_calculados pc
-        WHERE c.idcuadrante = pc.idcuadrante
-        RETURNING c.idcuadrante, c.precio, c.precio_construccion
-      `;
-      
-      const result = await query(updateQuery);
-      
-      const resetQuery = `
-        UPDATE Cuadrante
-        SET precio = 0, precio_construccion = 0
-        WHERE idcuadrante NOT IN (
-          SELECT DISTINCT idcuadrante 
-          FROM (${updateQuery.split('RETURNING')[0]}) AS subq
-        )
-      `;
-      
-      await query(resetQuery);
-      
+              UPDATE cuadrante 
+              SET 
+                  precio = $1,
+                  precio_construccion = $2
+              WHERE idcuadrante = $3
+              RETURNING *
+          `;
+      console.log(preciosPromedio);
+      const updatedCuadrante = await query(updateQuery, [
+        preciosPromedio.precioTerreno,
+        preciosPromedio.precioConstruccion,
+        cuadranteResult.rows[0].idcuadrante
+      ]);
+
       return {
-        actualizados: result.rows.length,
-        detalles: result.rows
+        success: true,
+        message: `Cuadrante "${cuadranteResult.rows[0].nombre}" actualizado correctamente`,
+        data: {
+          cuadrante: updatedCuadrante.rows[0],
+          precios_promedio: preciosPromedio
+        }
       };
-      
+
     } catch (error) {
-      throw new Error(`Error al recalcular cuadrantes: ${error.message}`);
+      console.error(`Error en recalcularCuadrante para propiedad ${propertyId}:`, error);
+      return {
+        success: false,
+        message: error.message,
+        error: error.stack
+      };
     }
   }
 }
