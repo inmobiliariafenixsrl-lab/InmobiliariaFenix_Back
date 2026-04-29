@@ -382,7 +382,6 @@ class CuadrantesService {
       if (cuadranteResult.rows.length === 0) {
         throw new Error(`No se encontró ningún cuadrante que contenga la propiedad en coordenadas (${property.latitud}, ${property.longitud})`);
       }
-      console.log(cuadranteResult.rows[0].nombre);
 
       const points = cuadranteResult.rows[0].puntos;
 
@@ -396,7 +395,7 @@ class CuadrantesService {
               WHERE idcuadrante = $3
               RETURNING *
           `;
-      console.log(preciosPromedio);
+      
       const updatedCuadrante = await query(updateQuery, [
         preciosPromedio.precioTerreno,
         preciosPromedio.precioConstruccion,
