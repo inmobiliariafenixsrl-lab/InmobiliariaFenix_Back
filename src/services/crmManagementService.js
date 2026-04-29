@@ -1,5 +1,6 @@
 const { query } = require("../../db");
 const AgenteMapper = require('../mappers/agente.mapper');
+const cuadrantesService = require('../services/cuadrantesService');
 
 const getProperties = async (filters = {}) => {
   try {
@@ -315,6 +316,15 @@ const createOffer = async (offerData) => {
       [propertyId, offeredBy, phone, amount, depositAmount, 1]
     );
 
+    await query(
+      `
+      UPDATE inmueble 
+      SET estado = 'reservado'
+      WHERE idinmueble = $1
+      `,
+      [propertyId]
+    );
+
     return result.rows[0];
   } catch (error) {
     console.error("Error en createOffer:", error);
@@ -325,29 +335,51 @@ const createOffer = async (offerData) => {
 const updateOfferStatus = async (offerId, propertyId, status) => {
   try {
     let propertyStatus = '';
+    let offerAmount = null;
+    
     switch (status) {
       case 'aceptada':
-        propertyStatus = 'reservado';
+        propertyStatus = 'vendido';
+        const offerResult = await query(
+          `SELECT monto_oferta FROM oferta_inmueble WHERE idoferta = $1`,
+          [offerId]
+        );
+        
+        if (offerResult.rows.length === 0) {
+          throw new Error('Oferta no encontrada');
+        }
+        
+        offerAmount = offerResult.rows[0].monto_oferta;
         break;
       case 'rechazada':
         propertyStatus = 'activo';
         break;
       default:
-        propertyStatus = 'en_proceso';
+        propertyStatus = 'activo';
     }
 
-    await query("BEGIN");
-
-    await query(
-      `
-      UPDATE inmueble 
-      SET estado = $1 
-      WHERE idinmueble = $2
-      `,
-      [propertyStatus, propertyId]
-    );
-
-    await query("COMMIT");
+    if (status === 'aceptada') {
+      await query(
+        `
+        UPDATE inmueble 
+        SET estado = $1, 
+            precio_capatacion_s = $2,
+            precio_vendido = $2
+        WHERE idinmueble = $3
+        `,
+        [propertyStatus, offerAmount, propertyId]
+      );
+      await cuadrantesService.recalcularCuadrante(propertyId);
+    } else {
+      await query(
+        `
+        UPDATE inmueble 
+        SET estado = $1 
+        WHERE idinmueble = $2
+        `,
+        [propertyStatus, propertyId]
+      );
+    }
 
     return {
       id: offerId,
