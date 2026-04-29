@@ -49,11 +49,23 @@ const getProperties = async (filters = {}) => {
       LEFT JOIN municipio m ON i.idmunicipio = m.idmunicipio
       LEFT JOIN provincia p ON m.idprovincia = p.idprovincia
       LEFT JOIN departamento d ON p.iddepartamento = d.iddepartamento
-      WHERE i.estado = 'activo' OR i.estado = 'reservado' OR i.estado = 'vendido'
+      WHERE (i.estado = 'activo' OR i.estado = 'reservado' OR i.estado = 'vendido')
     `;
 
     const params = [];
     let paramIndex = 1;
+
+    if (filters.searchTerm && filters.searchTerm.trim()) {
+      sql += ` AND (
+        i.titulo ILIKE $${paramIndex} OR 
+        m.nombre ILIKE $${paramIndex} OR 
+        p.nombre ILIKE $${paramIndex} OR
+        a.nombre ILIKE $${paramIndex} OR
+        a.apellido ILIKE $${paramIndex}
+      )`;
+      params.push(`%${filters.searchTerm.trim()}%`);
+      paramIndex++;
+    }
 
     if (filters.status) {
       sql += ` AND i.estado = $${paramIndex}`;

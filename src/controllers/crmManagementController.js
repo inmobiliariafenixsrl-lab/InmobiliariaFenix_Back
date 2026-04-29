@@ -2,8 +2,13 @@ const crmManagementService = require("../services/crmManagementService");
 
 const getProperties = async (req, res) => {
   try {
-    const { status, agentId, type } = req.query;
-    const filters = { status, agentId, type };
+    const { status, agentId, type, searchTerm } = req.query;
+    const filters = { 
+      status, 
+      agentId, 
+      type,
+      searchTerm 
+    };
     
     const properties = await crmManagementService.getProperties(filters);
     
