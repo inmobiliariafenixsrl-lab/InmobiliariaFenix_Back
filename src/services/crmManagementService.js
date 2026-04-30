@@ -307,7 +307,7 @@ const getOffersByProperty = async (propertyId) => {
   }
 };
 
-const createOffer = async (offerData) => {
+const createOffer = async (offerData, user) => {
   try {
     const { propertyId, amount, offeredBy, phone, depositAmount } = offerData;
     
@@ -325,7 +325,7 @@ const createOffer = async (offerData) => {
         celular_ofertante as phone,
         monto_seña as "depositAmount"
       `,
-      [propertyId, offeredBy, phone, amount, depositAmount, 1]
+      [propertyId, offeredBy, phone, amount, depositAmount, user.idagente]
     );
 
     await query(
@@ -344,7 +344,7 @@ const createOffer = async (offerData) => {
   }
 };
 
-const updateOfferStatus = async (offerId, propertyId, status) => {
+const updateOfferStatus = async (offerId, propertyId, status, user) => {
   try {
     let propertyStatus = '';
     let offerAmount = null;
@@ -381,6 +381,27 @@ const updateOfferStatus = async (offerId, propertyId, status) => {
         `,
         [propertyStatus, offerAmount, propertyId]
       );
+
+      await query(
+        `
+        UPDATE oferta_inmueble
+        SET estado = $1,
+            idagente_aceptado = $2
+        WHERE idoferta = $3
+        `,
+        ['aceptado', user.idagente, offerId]
+      );
+      
+      await query(
+        `
+        UPDATE oferta_inmueble
+        SET estado = $1
+        WHERE idoferta != $2
+            AND idinmueble = $3
+        `,
+        ['rechazado', offerId, propertyId]
+      );
+
       await cuadrantesService.recalcularCuadrante(propertyId);
     } else {
       await query(

@@ -122,6 +122,7 @@ const updatePropertyPrice = async (req, res) => {
 const createOffer = async (req, res) => {
   try {
     const offerData = req.body;
+    const user = req.user;
     
     if (!offerData.propertyId || !offerData.amount || !offerData.offeredBy) {
       return res.status(400).json({
@@ -130,7 +131,7 @@ const createOffer = async (req, res) => {
       });
     }
     
-    const offer = await crmManagementService.createOffer(offerData);
+    const offer = await crmManagementService.createOffer(offerData, user);
     
     res.status(201).json({
       success: true,
@@ -151,6 +152,7 @@ const updateOfferStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status, propertyId } = req.body;
+    const user = req.user;
     
     if (!status || !propertyId) {
       return res.status(400).json({
@@ -159,7 +161,7 @@ const updateOfferStatus = async (req, res) => {
       });
     }
     
-    const offer = await crmManagementService.updateOfferStatus(id, propertyId, status);
+    const offer = await crmManagementService.updateOfferStatus(id, propertyId, status, user);
     
     res.json({
       success: true,
