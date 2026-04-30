@@ -500,7 +500,6 @@ const getPropertyImagesMetadata = async (req, res) => {
 
 module.exports = {
   getAllProperties,
-  getPropertiesByAgent,
   getPropertyById,
   savePropertyProgress,
   updateProperty,
@@ -510,7 +509,6 @@ module.exports = {
   uploadDocument,
   getDocumentFile,
   deleteDocument,
-  getPropertiesByTeam,
   getAllActiveAgentes,
   getAgentesByGroup,
   getAgenteById,

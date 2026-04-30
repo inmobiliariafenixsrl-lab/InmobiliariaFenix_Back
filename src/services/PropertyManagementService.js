@@ -1141,7 +1141,6 @@ const getPropertyImagesMetadata = async (propertyId) => {
 
 module.exports = {
   getAllProperties,
-  getPropertiesByAgent,
   getPropertyById,
   savePropertyProgress,
   updateProperty,
@@ -1152,7 +1151,6 @@ module.exports = {
   uploadDocument,
   getDocumentFile,
   deleteDocument,
-  getPropertiesByTeam,
   getAllActiveAgentes,
   getAgentesByGroup,
   getAgenteById,
