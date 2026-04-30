@@ -110,6 +110,51 @@ const validateYearBuilt = (year) => {
   return null;
 };
 
+const validarCamposRequeridos = (data) => {
+    const camposValidacion = {
+        string: ['titulo', 'descripcion', 'operacion', 'tipo_propiedad', 'condicion', 
+                 'direccion', 'tipo_cambio_captacion', 'estado', 
+                 'nombre_propietario', 'celular_propietario'],
+        number: ['m2_terreno', 'm2_construccion', 'nro_pisos', 'nro_habitaciones', 
+                 'nro_baños', 'nro_estacionamiento', 'precio_capatacion_m', 
+                 'precio_capatacion_s', 'precio_captacion_i', 'año_construccion', 
+                 'porcentajeComision', 'precio_m2_construccion', 'porcentaje_depreciacion'],
+        coordinates: ['latitud', 'longitud'],
+        boolean: ['ascensor', 'garaje', 'terraza', 'piscina'],
+        id: ['idmunicipio']
+    };
+
+    for (const campo of camposValidacion.string) {
+        if (!data[campo] || typeof data[campo] !== 'string' || data[campo].trim() === '') {
+            return { error: 'MISSING_FIELD', campo: campo };
+        }
+    }
+
+    for (const campo of camposValidacion.number) {
+        if (data[campo] === undefined || data[campo] === null || isNaN(data[campo])) {
+            return { error: 'MISSING_FIELD', campo: campo };
+        }
+    }
+
+    for (const campo of camposValidacion.coordinates) {
+        if (data[campo] === undefined || data[campo] === null || isNaN(data[campo])) {
+            return { error: 'MISSING_FIELD', campo: campo };
+        }
+    }
+
+    for (const campo of camposValidacion.boolean) {
+        if (data[campo] === undefined || data[campo] === null || typeof data[campo] !== 'boolean') {
+            return { error: 'MISSING_FIELD', campo: campo };
+        }
+    }
+
+    if (!data.idmunicipio || isNaN(data.idmunicipio)) {
+        return { error: 'MISSING_FIELD', campo: 'idmunicipio' };
+    }
+
+    return null;
+}
+
 const saveDocuments = async (propertyId, documents, tipoCambioCaptacion) => {
   try {
     const tiposResult = await query(
@@ -283,6 +328,8 @@ const savePropertyProgress = async (propertyData, documents = null) => {
     nombre_propietario,
     celular_propietario,
     porcentajeComision,
+    precio_m2_construccion,
+    porcentaje_depreciacion,
   } = propertyData;
 
   const validatedTipoPropiedad = validatePropertyType(tipo_propiedad);
@@ -311,8 +358,9 @@ const savePropertyProgress = async (propertyData, documents = null) => {
         ascensor, garaje, terraza, piscina, año_construccion,
         latitud, longitud, idagente, estado, observacion,
         enlace_video, idmunicipio, nombre_propietario, celular_propietario,
-        porcentajeComision, fecha_creacion
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, TIMEZONE('America/La_Paz', NOW()))
+        porcentajeComision, precio_metro_construccion,
+        porcentajeDepreciacion, fecha_creacion
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33 TIMEZONE('America/La_Paz', NOW()))
       RETURNING *`,
       [
         titulo || "",
@@ -346,6 +394,8 @@ const savePropertyProgress = async (propertyData, documents = null) => {
         nombre_propietario || null,
         celular_propietario || null,
         porcentajeComision || 1,
+        precio_m2_construccion,
+        porcentaje_depreciacion,
       ],
     );
 
@@ -395,6 +445,8 @@ const updateProperty = async (id, propertyData, documents = null) => {
     nombre_propietario,
     celular_propietario,
     porcentajeComision,
+    precio_m2_construccion,
+    porcentaje_depreciacion
   } = propertyData;
 
   const validatedTipoPropiedad = validatePropertyType(tipo_propiedad);
@@ -408,6 +460,13 @@ const updateProperty = async (id, propertyData, documents = null) => {
     latitud && !isNaN(parseFloat(latitud)) ? parseFloat(latitud) : -17.3895;
   const validLongitud =
     longitud && !isNaN(parseFloat(longitud)) ? parseFloat(longitud) : -66.1568;
+
+  if (validatedEstado === "en revisión"){
+    const isMissingAnyField = validarCamposRequeridos(propertyData);
+    if (isMissingAnyField){
+      return isMissingAnyField;
+    }
+  }
 
   try {
     const result = await query(
@@ -441,8 +500,10 @@ const updateProperty = async (id, propertyData, documents = null) => {
         idmunicipio = $27,
         nombre_propietario = $28,
         celular_propietario = $29,
-        porcentajeComision = $30
-      WHERE idinmueble = $31
+        porcentajeComision = $30,
+        precio_metro_construccion = $31,
+        porcentajeDepreciacion = $32
+      WHERE idinmueble = $33
       RETURNING *`,
       [
         titulo || "",
@@ -475,6 +536,8 @@ const updateProperty = async (id, propertyData, documents = null) => {
         nombre_propietario || null,
         celular_propietario || null,
         porcentajeComision || 1,
+        precio_m2_construccion,
+        porcentaje_depreciacion,
         id,
       ],
     );

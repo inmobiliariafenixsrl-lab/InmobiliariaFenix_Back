@@ -129,6 +129,15 @@ const updateProperty = async (req, res) => {
     }
 
     const updatedProperty = await propertyManagementService.updateProperty(id, propertyData, documents);
+    if (updatedProperty?.error) {
+      switch (updatedProperty.error) {
+        case 'MISSING_FIELD':
+          return res.status(400).json({
+            success: false,
+            message: `Campo faltante: ${updatedProperty.campo}`,
+          });
+      }
+    }
     if (!updatedProperty) {
       return res.status(404).json({ error: "Inmueble no encontrado" });
     }
