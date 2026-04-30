@@ -28,15 +28,20 @@ const getAllProperties = async (req, res) => {
       success: true,
       data: result.properties,
       pagination: {
-        currentPage: filters.page,
+        page: filters.page,
         limit: filters.limit,
         total: result.total,
-        totalPages: Math.ceil(result.total / filters.limit)
+        totalPages: Math.ceil(result.total / filters.limit),
+        hasNextPage: filters.page < Math.ceil(result.total / filters.limit),
+        hasPrevPage: filters.page > 1
       }
     });
   } catch (error) {
     console.error("Error in getAllProperties:", error);
-    res.status(500).json({ error: "Error al obtener los inmuebles" });
+    res.status(500).json({ 
+      success: false,
+      message: "Error al obtener los inmuebles", 
+      error: "Error al obtener los inmuebles" });
   }
 };
 
