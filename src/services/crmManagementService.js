@@ -292,7 +292,8 @@ const getOffersByProperty = async (propertyId) => {
         monto_oferta as amount,
         nombre_ofertante as "offeredBy",
         celular_ofertante as phone,
-        monto_seña as "depositAmount"
+        monto_seña as "depositAmount",
+        estado as "status"
       FROM oferta_inmueble 
       WHERE idinmueble = $1
       ORDER BY fecha_oferta DESC
