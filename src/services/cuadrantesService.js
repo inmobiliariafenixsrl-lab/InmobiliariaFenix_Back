@@ -129,16 +129,18 @@ class CuadrantesService {
             m2_terreno,
             m2_construccion,
             precio_capatacion_m,
-            precio_capatacion_s,
+            precio_vendido,
             precio_captacion_i,
             tipo_cambio_captacion,
             operacion,
+            precio_metro_construccion,
+            porcentajeDepreciacion,
             CASE 
               -- Calcular precio por m² de terreno
-              WHEN m2_terreno > 0 AND precio_capatacion_s > 0 
-              THEN precio_capatacion_s / m2_terreno
+              WHEN m2_terreno > 0 AND precio_vendido > 0 
+              THEN (precio_vendido - (precio_metro_construccion * m2_construccion * (1 - porcentajeDepreciacion / 100 ))) / m2_terreno
               WHEN m2_terreno > 0 AND precio_capatacion_m > 0 
-              THEN precio_capatacion_m / m2_terreno
+              THEN (precio_capatacion_m - (precio_metro_construccion * m2_construccion * (1 - porcentajeDepreciacion / 100 ))) / m2_terreno
               ELSE NULL
             END as precio_m2_terreno,
             CASE 
