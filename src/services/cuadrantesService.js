@@ -9,22 +9,20 @@ class CuadrantesService {
           nombre as name,
           puntos as points,
           descripcion as description,
-          precio as price,
-          precio_construccion
+          precio as price
         FROM Cuadrante
         ORDER BY idcuadrante DESC
       `;
 
       const result = await query(consulta);
 
-      const cuadrantes = result.rows.map(cuadrante => ({
+      const cuadrantes = result.rows.map((cuadrante) => ({
         id: cuadrante.id.toString(),
         name: cuadrante.name,
         points: cuadrante.points || [],
-        description: cuadrante.description || '',
+        description: cuadrante.description || "",
         price: parseFloat(cuadrante.price),
-        precio_construccion: parseFloat(cuadrante.precio_construccion),
-        color: this.generateColorFromId(cuadrante.id)
+        color: this.generateColorFromId(cuadrante.id),
       }));
 
       return cuadrantes;
@@ -35,25 +33,27 @@ class CuadrantesService {
 
   async createCuadrante(cuadranteData) {
     try {
-      await query('BEGIN');
+      await query("BEGIN");
 
       const {
         name,
         points,
-        description = '',
-        color = this.generateColorFromId(null)
+        description = "",
+        color = this.generateColorFromId(null),
       } = cuadranteData;
 
       if (!Array.isArray(points) || points.length < 3) {
-        throw new Error('El polígono debe tener al menos 3 puntos');
+        throw new Error("El polígono debe tener al menos 3 puntos");
       }
 
       for (let i = 0; i < points.length; i++) {
         const point = points[i];
         if (!Array.isArray(point) || point.length !== 2) {
-          throw new Error(`El punto en la posición ${i} debe ser un array con dos coordenadas [lat, lng]`);
+          throw new Error(
+            `El punto en la posición ${i} debe ser un array con dos coordenadas [lat, lng]`,
+          );
         }
-        if (typeof point[0] !== 'number' || typeof point[1] !== 'number') {
+        if (typeof point[0] !== "number" || typeof point[1] !== "number") {
           throw new Error(`Las coordenadas del punto ${i} deben ser números`);
         }
         if (isNaN(point[0]) || isNaN(point[1])) {
@@ -62,43 +62,40 @@ class CuadrantesService {
       }
 
       const insertQuery = `
-        INSERT INTO Cuadrante (nombre, puntos, descripcion, precio, precio_construccion)
-        VALUES ($1, $2, $3, 0, 0)
+        INSERT INTO Cuadrante (nombre, puntos, descripcion, precio)
+        VALUES ($1, $2, $3, 0)
         RETURNING idcuadrante
       `;
 
       const insertResult = await query(insertQuery, [
         name,
         JSON.stringify(points),
-        description
+        description,
       ]);
 
       const cuadranteId = insertResult.rows[0].idcuadrante;
 
-      const preciosCalculados = await this.calcularPreciosPromedioCuadrante(
-        points
-      );
+      const preciosCalculados =
+        await this.calcularPreciosPromedioCuadrante(points);
 
       const updateQuery = `
         UPDATE Cuadrante
-        SET precio = $1, precio_construccion = $2
-        WHERE idcuadrante = $3
+        SET precio = $1
+        WHERE idcuadrante = $2
         RETURNING 
           idcuadrante as id,
           nombre as name,
           puntos as points,
           descripcion as description,
-          precio as price,
-          precio_construccion as precio_construccion
+          precio as price
       `;
 
       const updateResult = await query(updateQuery, [
         preciosCalculados.precioTerreno,
-        preciosCalculados.precioConstruccion,
-        cuadranteId
+        cuadranteId,
       ]);
 
-      await query('COMMIT');
+      await query("COMMIT");
 
       const newCuadrante = updateResult.rows[0];
 
@@ -106,14 +103,12 @@ class CuadrantesService {
         id: newCuadrante.id.toString(),
         name: newCuadrante.name,
         points: newCuadrante.points,
-        description: newCuadrante.description || '',
+        description: newCuadrante.description || "",
         price: parseFloat(newCuadrante.price) || 0,
-        precioConstruccion: parseFloat(newCuadrante.precio_construccion) || 0,
         color: color,
       };
-
     } catch (error) {
-      await query('ROLLBACK');
+      await query("ROLLBACK");
       throw new Error(`Error al crear zona: ${error.message}`);
     }
   }
@@ -121,8 +116,8 @@ class CuadrantesService {
   async calcularPreciosPromedioCuadrante(points) {
     try {
       const polygonPoints = points
-        .map(point => `${point[1]} ${point[0]}`) // lng lat
-        .join(',');
+        .map((point) => `${point[1]} ${point[0]}`) // lng lat
+        .join(",");
 
       const firstPoint = points[0];
       const closedPolygon = `${polygonPoints},${firstPoint[1]} ${firstPoint[0]}`;
@@ -185,11 +180,12 @@ class CuadrantesService {
 
       return {
         precioTerreno: Math.round(parseFloat(stats.promedio_terreno) || 0),
-        precioConstruccion: Math.round(parseFloat(stats.promedio_construccion) || 0),
+        precioConstruccion: Math.round(
+          parseFloat(stats.promedio_construccion) || 0,
+        ),
       };
-
     } catch (error) {
-      console.error('Error en calcularPreciosPromedioCuadrante:', error);
+      console.error("Error en calcularPreciosPromedioCuadrante:", error);
       return {
         precioTerreno: 0,
         precioConstruccion: 0,
@@ -198,15 +194,16 @@ class CuadrantesService {
           inmueblesConPrecioTerreno: 0,
           inmueblesConPrecioConstruccion: 0,
           rangoTerreno: { min: 0, max: 0, desviacion: 0 },
-          rangoConstruccion: { min: 0, max: 0, desviacion: 0 }
-        }
+          rangoConstruccion: { min: 0, max: 0, desviacion: 0 },
+        },
       };
     }
   }
 
   async updateCuadrante(id, cuadranteData) {
     try {
-      const checkQuery = 'SELECT idcuadrante, puntos FROM Cuadrante WHERE idcuadrante = $1';
+      const checkQuery =
+        "SELECT idcuadrante, puntos FROM Cuadrante WHERE idcuadrante = $1";
       const checkResult = await query(checkQuery, [id]);
 
       if (checkResult.rows.length === 0) {
@@ -216,16 +213,21 @@ class CuadrantesService {
       let pointsToUse = checkResult.rows[0].puntos;
 
       if (cuadranteData.points !== undefined) {
-        if (!Array.isArray(cuadranteData.points) || cuadranteData.points.length < 3) {
-          throw new Error('El polígono debe tener al menos 3 puntos');
+        if (
+          !Array.isArray(cuadranteData.points) ||
+          cuadranteData.points.length < 3
+        ) {
+          throw new Error("El polígono debe tener al menos 3 puntos");
         }
 
         for (let i = 0; i < cuadranteData.points.length; i++) {
           const point = cuadranteData.points[i];
           if (!Array.isArray(point) || point.length !== 2) {
-            throw new Error(`El punto en la posición ${i} debe ser un array con dos coordenadas [lat, lng]`);
+            throw new Error(
+              `El punto en la posición ${i} debe ser un array con dos coordenadas [lat, lng]`,
+            );
           }
-          if (typeof point[0] !== 'number' || typeof point[1] !== 'number') {
+          if (typeof point[0] !== "number" || typeof point[1] !== "number") {
             throw new Error(`Las coordenadas del punto ${i} deben ser números`);
           }
           if (isNaN(point[0]) || isNaN(point[1])) {
@@ -235,7 +237,8 @@ class CuadrantesService {
         pointsToUse = cuadranteData.points;
       }
 
-      const preciosCalculados = await this.calcularPreciosPromedioCuadrante(pointsToUse);
+      const preciosCalculados =
+        await this.calcularPreciosPromedioCuadrante(pointsToUse);
 
       const updates = [];
       const values = [];
@@ -259,26 +262,22 @@ class CuadrantesService {
       updates.push(`precio = $${paramCount++}`);
       values.push(preciosCalculados.precioTerreno);
 
-      updates.push(`precio_construccion = $${paramCount++}`);
-      values.push(preciosCalculados.precioConstruccion);
-
       if (updates.length === 0) {
-        throw new Error('No hay datos para actualizar');
+        throw new Error("No hay datos para actualizar");
       }
 
       values.push(id);
 
       const consulta = `
         UPDATE Cuadrante 
-        SET ${updates.join(', ')}
+        SET ${updates.join(", ")}
         WHERE idcuadrante = $${paramCount}
         RETURNING 
           idcuadrante as id,
           nombre as name,
           puntos as points,
           descripcion as description,
-          precio as price,
-          precio_construccion as precio_construccion
+          precio as price
       `;
 
       const result = await query(consulta, values);
@@ -288,9 +287,8 @@ class CuadrantesService {
         id: updatedCuadrante.id.toString(),
         name: updatedCuadrante.name,
         points: updatedCuadrante.points,
-        description: updatedCuadrante.description || '',
+        description: updatedCuadrante.description || "",
         price: parseFloat(updatedCuadrante.price) || 0,
-        precioConstruccion: parseFloat(updatedCuadrante.precio_construccion) || 0,
         color: this.generateColorFromId(updatedCuadrante.id),
       };
     } catch (error) {
@@ -301,18 +299,15 @@ class CuadrantesService {
   async deleteCuadrante(id) {
     try {
       const grupo = await query(
-        'SELECT * FROM cuadrante WHERE idcuadrante = $1',
-        [id]
+        "SELECT * FROM cuadrante WHERE idcuadrante = $1",
+        [id],
       );
 
       if (grupo.rows.length === 0) {
         return false;
       }
 
-      await query(
-        'DELETE FROM cuadrante WHERE idcuadrante = $1',
-        [id]
-      );
+      await query("DELETE FROM cuadrante WHERE idcuadrante = $1", [id]);
 
       return true;
     } catch (error) {
@@ -322,7 +317,17 @@ class CuadrantesService {
   }
 
   generateColorFromId(id) {
-    const colors = ['#ff0000', '#00ff00', '#0000ff', '#a88900', '#ff00ff', '#00ffff', '#ff6600', '#a00c47', '#3f3f3f'];
+    const colors = [
+      "#ff0000",
+      "#00ff00",
+      "#0000ff",
+      "#a88900",
+      "#ff00ff",
+      "#00ffff",
+      "#ff6600",
+      "#a00c47",
+      "#3f3f3f",
+    ];
     if (!id) return colors[Math.floor(Math.random() * colors.length)];
     return colors[id % colors.length];
   }
@@ -347,7 +352,9 @@ class CuadrantesService {
       const property = propertyResult.rows[0];
 
       if (!property.latitud || !property.longitud) {
-        throw new Error(`La propiedad ${propertyId} no tiene coordenadas definidas`);
+        throw new Error(
+          `La propiedad ${propertyId} no tiene coordenadas definidas`,
+        );
       }
 
       const findCuadranteQuery = `
@@ -356,8 +363,7 @@ class CuadrantesService {
           c.nombre,
           c.descripcion,
           c.puntos,
-          c.precio,
-          c.precio_construccion
+          c.precio
         FROM cuadrante c
         WHERE ST_Within(
           ST_SetSRID(ST_MakePoint($1, $2), 4326),
@@ -380,26 +386,27 @@ class CuadrantesService {
       ]);
 
       if (cuadranteResult.rows.length === 0) {
-        throw new Error(`No se encontró ningún cuadrante que contenga la propiedad en coordenadas (${property.latitud}, ${property.longitud})`);
+        throw new Error(
+          `No se encontró ningún cuadrante que contenga la propiedad en coordenadas (${property.latitud}, ${property.longitud})`,
+        );
       }
 
       const points = cuadranteResult.rows[0].puntos;
 
-      const preciosPromedio = await this.calcularPreciosPromedioCuadrante(points);
+      const preciosPromedio =
+        await this.calcularPreciosPromedioCuadrante(points);
 
       const updateQuery = `
               UPDATE cuadrante 
               SET 
-                  precio = $1,
-                  precio_construccion = $2
-              WHERE idcuadrante = $3
+                  precio = $1
+              WHERE idcuadrante = $2
               RETURNING *
           `;
-      
+
       const updatedCuadrante = await query(updateQuery, [
         preciosPromedio.precioTerreno,
-        preciosPromedio.precioConstruccion,
-        cuadranteResult.rows[0].idcuadrante
+        cuadranteResult.rows[0].idcuadrante,
       ]);
 
       return {
@@ -407,16 +414,18 @@ class CuadrantesService {
         message: `Cuadrante "${cuadranteResult.rows[0].nombre}" actualizado correctamente`,
         data: {
           cuadrante: updatedCuadrante.rows[0],
-          precios_promedio: preciosPromedio
-        }
+          precios_promedio: preciosPromedio,
+        },
       };
-
     } catch (error) {
-      console.error(`Error en recalcularCuadrante para propiedad ${propertyId}:`, error);
+      console.error(
+        `Error en recalcularCuadrante para propiedad ${propertyId}:`,
+        error,
+      );
       return {
         success: false,
         message: error.message,
-        error: error.stack
+        error: error.stack,
       };
     }
   }
