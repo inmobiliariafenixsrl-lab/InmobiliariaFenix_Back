@@ -1,23 +1,42 @@
 const propertyManagementService = require("../services/PropertyManagementService");
 
 const getAllProperties = async (req, res) => {
+  const user = req.user;
+  const { 
+    searchTerm, 
+    estado,
+    tipoPropiedad,
+    agenteId,
+    tipoVenta,
+    page = 1,
+    limit = 10
+  } = req.query;
+  
+  const filters = {
+    searchTerm: searchTerm || null,
+    estado: estado || null,
+    tipoPropiedad: tipoPropiedad || null,
+    agenteId: agenteId ? parseInt(agenteId) : null,
+    tipoVenta: tipoVenta || null,
+    page: parseInt(page),
+    limit: parseInt(limit)
+  };
+  
   try {
-    const properties = await propertyManagementService.getAllProperties();
-    res.status(200).json(properties);
+    const result = await propertyManagementService.getAllProperties(user, filters);
+    res.status(200).json({
+      success: true,
+      data: result.properties,
+      pagination: {
+        currentPage: filters.page,
+        limit: filters.limit,
+        total: result.total,
+        totalPages: Math.ceil(result.total / filters.limit)
+      }
+    });
   } catch (error) {
     console.error("Error in getAllProperties:", error);
     res.status(500).json({ error: "Error al obtener los inmuebles" });
-  }
-};
-
-const getPropertiesByAgent = async (req, res) => {
-  try {
-    const { agentId } = req.params;
-    const properties = await propertyManagementService.getPropertiesByAgent(agentId);
-    res.status(200).json(properties);
-  } catch (error) {
-    console.error("Error in getPropertiesByAgent:", error);
-    res.status(500).json({ error: "Error al obtener los inmuebles del agente" });
   }
 };
 
@@ -268,17 +287,6 @@ const deleteDocument = async (req, res) => {
   } catch (error) {
     console.error("Error in deleteDocument:", error);
     res.status(500).json({ error: "Error al eliminar el documento" });
-  }
-};
-
-const getPropertiesByTeam = async (req, res) => {
-  try {
-    const { groupId } = req.params;
-    const properties = await propertyManagementService.getPropertiesByTeam(groupId);
-    res.status(200).json(properties);
-  } catch (error) {
-    console.error("Error in getPropertiesByTeam:", error);
-    res.status(500).json({ error: "Error al obtener los inmuebles del equipo" });
   }
 };
 

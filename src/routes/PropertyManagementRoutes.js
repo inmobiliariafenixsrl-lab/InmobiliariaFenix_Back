@@ -14,8 +14,6 @@ router.get('/departments', propertyManagementController.getUbications);
 
 // Rutas para gestión de inmuebles
 router.get("/", propertyManagementController.getAllProperties);
-router.get("/agent/:agentId", propertyManagementController.getPropertiesByAgent);
-router.get("/team/:groupId", propertyManagementController.getPropertiesByTeam);
 router.get("/:id", propertyManagementController.getPropertyById);
 router.post("/save-progress", propertyManagementController.savePropertyProgress);
 router.put("/:id", propertyManagementController.updateProperty);

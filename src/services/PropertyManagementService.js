@@ -213,39 +213,127 @@ const saveDocuments = async (propertyId, documents, tipoCambioCaptacion) => {
   }
 };
 
-const getAllProperties = async () => {
+const getAllProperties = async (user, filters) => {
   try {
-    const result = await query(
-      `SELECT i.*, 
-              a.nombre as agente_nombre, 
-              a.apellido as agente_apellido
-       FROM Inmueble i
-       LEFT JOIN Agente a ON i.idagente = a.idagente
-       WHERE i.estado NOT IN ('eliminado') 
-       ORDER BY i.fecha_creacion DESC`,
+    let baseQuery = `
+      SELECT i.*, 
+             a.nombre as agente_nombre, 
+             a.apellido as agente_apellido
+      FROM Inmueble i
+      LEFT JOIN Agente a ON i.idagente = a.idagente
+      LEFT JOIN Municipio m ON i.idmunicipio = m.idmunicipio
+      LEFT JOIN Provincia p ON m.idprovincia = p.idprovincia
+      LEFT JOIN Departamento d ON p.iddepartamento = d.iddepartamento
+      WHERE i.estado NOT IN ('eliminado')
+    `;
+    
+    const queryParams = [];
+    let paramCounter = 1;
+    
+    let whereClauses = [];
+    
+    if (filters.estado) {
+      whereClauses.push(`i.estado = $${paramCounter}`);
+      queryParams.push(filters.estado);
+      paramCounter++;
+    }
+    
+    if (filters.tipoPropiedad) {
+      whereClauses.push(`i.tipo_propiedad = $${paramCounter}`);
+      queryParams.push(filters.tipoPropiedad);
+      paramCounter++;
+    }
+    
+    if (filters.tipoVenta) {
+      whereClauses.push(`i.operacion = $${paramCounter}`);
+      queryParams.push(filters.tipoVenta);
+      paramCounter++;
+    }
+    
+    if (filters.searchTerm) {
+      const searchPattern = `%${filters.searchTerm}%`;
+      whereClauses.push(`(
+        i.titulo ILIKE $${paramCounter} OR 
+        m.nombre ILIKE $${paramCounter} OR 
+        p.nombre ILIKE $${paramCounter} OR 
+        d.nombre ILIKE $${paramCounter}
+      )`);
+      queryParams.push(searchPattern);
+      paramCounter++;
+    }
+    
+    if (user.rol === 'team_leader') {
+      const agentsResult = await query(
+        `SELECT idagente FROM Agente WHERE idgrupo IS NOT NULL AND idgrupo = $1 AND estado = 'activo'`,
+        [user.idgrupo]
+      );
+      
+      const agentIds = agentsResult.rows.map(a => a.idagente);
+      agentIds.push(user.idagente);
+      
+      if (agentIds.length > 0) {
+        const placeholders = agentIds.map((_, idx) => `$${paramCounter + idx}`).join(', ');
+        whereClauses.push(`i.idagente IN (${placeholders})`);
+        queryParams.push(...agentIds);
+        paramCounter += agentIds.length;
+      } else {
+        return { properties: [], total: 0 };
+      }
+      
+      if (filters.agenteId) {
+        if (agentIds.includes(filters.agenteId)) {
+          whereClauses.push(`i.idagente = $${paramCounter}`);
+          queryParams.push(filters.agenteId);
+          paramCounter++;
+        } else {
+          return { properties: [], total: 0 };
+        }
+      }
+      
+    } else if (user.rol === 'agente') {
+      whereClauses.push(`i.idagente = $${paramCounter}`);
+      queryParams.push(user.idagente);
+      paramCounter++;
+      
+      if (filters.agenteId && filters.agenteId !== user.idagente) {
+        return { properties: [], total: 0 };
+      }
+      
+    } else if (user.rol === 'administrador') {
+      if (filters.agenteId) {
+        whereClauses.push(`i.idagente = $${paramCounter}`);
+        queryParams.push(filters.agenteId);
+        paramCounter++;
+      }
+    }
+    
+    if (whereClauses.length > 0) {
+      baseQuery += ' AND ' + whereClauses.join(' AND ');
+    }
+    
+    const countQuery = baseQuery.replace(
+      /SELECT\s+i\.\*\s*,\s*a\.nombre[^F]*/,
+      'SELECT COUNT(*) as total '
     );
-    return result.rows;
+    
+    baseQuery += ` GROUP BY i.fecha_creacion, i.idinmueble, a.nombre, a.apellido ORDER BY i.fecha_creacion DESC`;
+    
+    const countResult = await query(countQuery, queryParams);
+    const total = parseInt(countResult.rows[0].total);
+    
+    const offset = (filters.page - 1) * filters.limit;
+    baseQuery += ` LIMIT $${paramCounter} OFFSET $${paramCounter + 1}`;
+    queryParams.push(filters.limit, offset);
+    
+    const result = await query(baseQuery, queryParams);
+    
+    return {
+      properties: result.rows,
+      total: total
+    };
+    
   } catch (error) {
-    console.error("Error in getAllProperties:", error);
-    throw error;
-  }
-};
-
-const getPropertiesByAgent = async (agentId) => {
-  try {
-    const result = await query(
-      `SELECT i.*, 
-              a.nombre as agente_nombre, 
-              a.apellido as agente_apellido
-       FROM Inmueble i
-       LEFT JOIN Agente a ON i.idagente = a.idagente
-       WHERE i.idagente = $1 AND i.estado NOT IN ('eliminado') 
-       ORDER BY i.fecha_creacion DESC`,
-      [agentId],
-    );
-    return result.rows;
-  } catch (error) {
-    console.error("Error in getPropertiesByAgent:", error);
+    console.error("Error in getAllPropertiesByRole:", error);
     throw error;
   }
 };
@@ -630,40 +718,6 @@ const deleteDocument = async (documentId) => {
     return result.rows[0];
   } catch (error) {
     console.error("Error in deleteDocument:", error);
-    throw error;
-  }
-};
-
-const getPropertiesByTeam = async (groupId) => {
-  try {
-    const agentsResult = await query(
-      `SELECT idagente FROM Agente WHERE idgrupo = $1 AND estado = 'activo'`,
-      [groupId]
-    );
-    
-    const agentIds = agentsResult.rows.map(a => a.idagente);
-    
-    if (agentIds.length === 0) {
-      return [];
-    }
-    
-    const placeholders = agentIds.map((_, i) => `$${i + 1}`).join(', ');
-    
-    const result = await query(
-      `SELECT i.*, 
-              a.nombre as agente_nombre, 
-              a.apellido as agente_apellido
-       FROM Inmueble i
-       LEFT JOIN Agente a ON i.idagente = a.idagente
-       WHERE i.idagente IN (${placeholders}) 
-         AND i.estado NOT IN ('eliminado') 
-       ORDER BY i.fecha_creacion DESC`,
-      agentIds
-    );
-    
-    return result.rows;
-  } catch (error) {
-    console.error("Error in getPropertiesByTeam:", error);
     throw error;
   }
 };
