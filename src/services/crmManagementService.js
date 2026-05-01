@@ -351,7 +351,7 @@ const updateOfferStatus = async (offerId, propertyId, status, user) => {
     let offerAmount = null;
     
     switch (status) {
-      case 'aceptada':
+      case 'aceptado':
         propertyStatus = 'vendido';
         const offerResult = await query(
           `SELECT monto_oferta FROM oferta_inmueble WHERE idoferta = $1`,
@@ -364,14 +364,14 @@ const updateOfferStatus = async (offerId, propertyId, status, user) => {
         
         offerAmount = offerResult.rows[0].monto_oferta;
         break;
-      case 'rechazada':
+      case 'rechazado':
         propertyStatus = 'activo';
         break;
       default:
         propertyStatus = 'activo';
     }
 
-    if (status === 'aceptada') {
+    if (status === 'aceptado') {
       await query(
         `
         UPDATE inmueble 
