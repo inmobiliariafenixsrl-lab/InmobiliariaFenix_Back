@@ -501,6 +501,25 @@ const getTimelineByProperty = async (propertyId, priceChanges, offers) => {
     });
 
     timeline.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const offerAceptado = offers.find(offer => offer.status === "aceptado");
+    const formatPriceUSD = (price) => {
+      const roundedNumber = Math.round(price);
+      const formattedNumber = roundedNumber.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+      return `${formattedNumber} USD`;
+    };
+
+    if(offerAceptado){
+      timeline.push({
+        id: `sell-${propertyId}`,
+        propertyId,
+        type: "cambio_estado",
+        title: "Propiedad vendida",
+        description: `Vendida por ${formatPriceUSD(offerAceptado.amount)} a ${offerAceptado.offeredBy}`,
+        by: offerAceptado.offeredBy,
+        newStatus: "vendido",
+      })
+    }
     
     return timeline;
   } catch (error) {
