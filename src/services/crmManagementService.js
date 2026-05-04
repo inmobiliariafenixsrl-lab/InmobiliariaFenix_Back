@@ -299,7 +299,7 @@ const updatePropertyPrice = async (propertyId, newPrice, user) => {
       return { error: 'PERMISSION_DENIED' };
     }
 
-    const previousPrice = property.price;
+    const previousPrice = property.idealPrice;
     
     await query("BEGIN");
 
@@ -323,7 +323,7 @@ const updatePropertyPrice = async (propertyId, newPrice, user) => {
 
     await query("COMMIT");
 
-    property.price = newPrice;
+    property.idealPrice = newPrice;
     
     return property;
   } catch (error) {
