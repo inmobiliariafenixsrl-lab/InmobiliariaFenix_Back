@@ -85,8 +85,8 @@ const updateProperty = async (req, res) => {
 const updatePropertyPrice = async (req, res) => {
   try {
     const { id } = req.params;
-    const { newPrice, reason } = req.body;
-    const userId = req.user?.id || 1;
+    const { newPrice } = req.body;
+    const user = req.user;
     
     if (!newPrice) {
       return res.status(400).json({
@@ -95,8 +95,24 @@ const updatePropertyPrice = async (req, res) => {
       });
     }
     
-    const property = await crmManagementService.updatePropertyPrice(id, newPrice, reason, userId);
+    const property = await crmManagementService.updatePropertyPrice(id, newPrice, user);
     
+    if (property?.error) {
+      switch (property.error) {
+        case 'PERMISSION_DENIED':
+          return res.status(403).json({
+            success: false,
+            message: "Permiso para editar el precio denegado",
+          });
+        
+        default:
+          return res.status(400).json({
+            success: false,
+            message: "Error al modificar el precio",
+          });
+      }
+    }
+
     if (!property) {
       return res.status(404).json({
         success: false,

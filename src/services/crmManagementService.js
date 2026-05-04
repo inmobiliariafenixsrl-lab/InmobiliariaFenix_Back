@@ -2,6 +2,39 @@ const { query } = require("../../db");
 const AgenteMapper = require('../mappers/agente.mapper');
 const cuadrantesService = require('../services/cuadrantesService');
 
+const canEditPropertyPrice = async (agentId, user) => {
+  if (user.rol === 'administrador') {
+    return true;
+  }
+  
+  if (user.rol === 'team_leader') {
+    try {
+      const result = await query(
+        `SELECT EXISTS(
+          SELECT 1 
+          FROM agente a1
+          JOIN agente a2 ON a1.idgrupo = a2.idgrupo
+          WHERE a1.idagente = $1 
+            AND a2.idagente = $2
+            AND a1.idgrupo IS NOT NULL
+        ) AS same_group`,
+        [user.idagente, agentId]
+      );
+
+      return result.rows[0].same_group;
+    } catch (error) {
+      console.error("Error verificando permisos de team_leader:", error);
+      return false;
+    }
+  }
+  
+  if (user.rol === 'agente') {
+    return user.idagente === agentId;
+  }
+  
+  return false;
+};
+
 const getProperties = async (filters = {}) => {
   try {
     let sql = `
@@ -242,11 +275,15 @@ const updateProperty = async (id, updateData) => {
   }
 };
 
-const updatePropertyPrice = async (propertyId, newPrice, reason, userId) => {
+const updatePropertyPrice = async (propertyId, newPrice, user) => {
   try {
     const property = await getPropertyById(propertyId);
     if (!property) {
       throw new Error("Propiedad no encontrada");
+    }
+
+    if(!(await canEditPropertyPrice(property.agentId, user))){
+      return { error: 'PERMISSION_DENIED' };
     }
 
     const previousPrice = property.price;
@@ -268,7 +305,7 @@ const updatePropertyPrice = async (propertyId, newPrice, reason, userId) => {
       (idinmueble, precio_anterior, precio_nuevo, idagente_modificador)
       VALUES ($1, $2, $3, $4)
       `,
-      [propertyId, previousPrice, newPrice, userId]
+      [propertyId, previousPrice, newPrice, user.idagente]
     );
 
     await query("COMMIT");
