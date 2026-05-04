@@ -174,16 +174,17 @@ class DocumentManagementService {
       INNER JOIN inmueble i ON r.idinmueble = i.idinmueble
       INNER JOIN agente rev ON r.idagente = rev.idagente
       LEFT JOIN agente ag ON i.idagente = ag.idagente
+      WHERE
     `;
     
     const params = [];
     
     if (userRole !== 'administrador') {
-      sql += ` WHERE r.idagente = $1`;
+      sql += ` r.idagente = $1 AND `;
       params.push(reviewerId);
     }
     
-    sql += ` ORDER BY r.fecha_revision DESC LIMIT 100`;
+    sql += ` i.estado != 'reservado' AND i.estado != 'vendido' ORDER BY r.fecha_revision DESC LIMIT 100`;
     
     const result = await query(sql, params);
     
