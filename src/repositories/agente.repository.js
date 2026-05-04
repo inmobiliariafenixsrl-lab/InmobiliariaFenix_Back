@@ -187,7 +187,21 @@ const { query } = require("../../db");
 
   const findCurrentAgente = async (id) => {
     const result = await query(
-      'SELECT * FROM Agente WHERE idAgente = $1 AND estado != $2',
+      `SELECT 
+        a.idAgente,
+        a.nombre,
+        a.apellido,
+        a.email,
+        a.telefono,
+        a.ci,
+        a.direccion,
+        a.especializacion,
+        a.rol,
+        a.estado,
+        a.fecha_creacion,
+        a.idgrupo,
+        a.porcentajeComision
+      FROM Agente a WHERE a.idAgente = $1 AND a.estado != $2`,
       [id, 'eliminado']
     );
     return result.rows[0] || null;
