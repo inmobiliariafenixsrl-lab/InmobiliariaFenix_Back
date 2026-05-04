@@ -138,9 +138,9 @@ class CuadrantesService {
             CASE 
               -- Calcular precio por m² de terreno
               WHEN m2_terreno > 0 AND precio_vendido > 0 
-              THEN (precio_vendido - (precio_metro_construccion * m2_construccion * (1 - porcentajeDepreciacion / 100 ))) / m2_terreno
+              THEN (precio_vendido - (precio_metro_construccion * m2_construccion * (1 - porcentajeDepreciacion::NUMERIC / 100 ))) / m2_terreno
               WHEN m2_terreno > 0 AND precio_capatacion_m > 0 
-              THEN (precio_capatacion_m - (precio_metro_construccion * m2_construccion * (1 - porcentajeDepreciacion / 100 ))) / m2_terreno
+              THEN (precio_capatacion_m - (precio_metro_construccion * m2_construccion * (1 - porcentajeDepreciacion::NUMERIC / 100 ))) / m2_terreno
               ELSE NULL
             END as precio_m2_terreno,
             CASE 
@@ -179,7 +179,7 @@ class CuadrantesService {
 
       const result = await query(consulta);
       const stats = result.rows[0];
-
+      console.log(stats);
       return {
         precioTerreno: Math.round(parseFloat(stats.promedio_terreno) || 0),
         precioConstruccion: Math.round(
