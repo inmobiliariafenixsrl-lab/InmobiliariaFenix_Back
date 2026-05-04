@@ -35,6 +35,69 @@ const canEditPropertyPrice = async (agentId, user) => {
   return false;
 };
 
+const getProperty = async (id) => {
+  try {
+    const result = await query(
+      `
+      SELECT 
+        i.idinmueble as id,
+        i.titulo as title,
+        i.descripcion as description,
+        i.precio_capatacion_s as price,
+        i.operacion as type,
+        i.tipo_propiedad as "propertyType",
+        d.nombre as department,
+        p.nombre as province,
+        m.nombre as municipality,
+        m.nombre as city,
+        i.direccion as address,
+        i.m2_construccion as "sqMeters",
+        i.m2_terreno as "sqMetersLand",
+        i.nro_pisos as "numberOfFloors",
+        i.nro_habitaciones as bedrooms,
+        i.nro_baños as bathrooms,
+        i.nro_estacionamiento as "parkingSpots",
+        i.ascensor as "hasElevator",
+        i.garaje as "hasGarage",
+        i.terraza as "hasTerrace",
+        i.piscina as "hasPool",
+        i.año_construccion as "yearBuilt",
+        i.condicion as condition,
+        i.estado as status,
+        i.idagente as "agentId",
+        a.nombre || ' ' || a.apellido as "agentName",
+        i.fecha_creacion as "capturedDate",
+        i.observacion as observations,
+        i.enlace_video as enlace_video,
+        i.latitud as lat,
+        i.longitud as lng,
+        i.nombre_propietario,
+        i.celular_propietario,
+        i.idmunicipio,
+        i.porcentajeComision as "porcentajeComision",
+        i.precio_capatacion_m as "minPrice",
+        i.precio_captacion_i as "idealPrice"
+      FROM inmueble i
+      LEFT JOIN agente a ON i.idagente = a.idagente
+      LEFT JOIN municipio m ON i.idmunicipio = m.idmunicipio
+      LEFT JOIN provincia p ON m.idprovincia = p.idprovincia
+      LEFT JOIN departamento d ON p.iddepartamento = d.iddepartamento
+      WHERE i.idinmueble = $1 AND i.estado != 'eliminado'
+      `,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    return result.rows[0];
+  } catch (error) {
+    console.error("Error en getProperty:", error);
+    throw error;
+  }
+};
+
 const getProperties = async (filters = {}) => {
   try {
     let sql = `
@@ -131,61 +194,11 @@ const getProperties = async (filters = {}) => {
 
 const getPropertyById = async (id) => {
   try {
-    const result = await query(
-      `
-      SELECT 
-        i.idinmueble as id,
-        i.titulo as title,
-        i.descripcion as description,
-        i.precio_capatacion_s as price,
-        i.operacion as type,
-        i.tipo_propiedad as "propertyType",
-        d.nombre as department,
-        p.nombre as province,
-        m.nombre as municipality,
-        m.nombre as city,
-        i.direccion as address,
-        i.m2_construccion as "sqMeters",
-        i.m2_terreno as "sqMetersLand",
-        i.nro_pisos as "numberOfFloors",
-        i.nro_habitaciones as bedrooms,
-        i.nro_baños as bathrooms,
-        i.nro_estacionamiento as "parkingSpots",
-        i.ascensor as "hasElevator",
-        i.garaje as "hasGarage",
-        i.terraza as "hasTerrace",
-        i.piscina as "hasPool",
-        i.año_construccion as "yearBuilt",
-        i.condicion as condition,
-        i.estado as status,
-        i.idagente as "agentId",
-        a.nombre || ' ' || a.apellido as "agentName",
-        i.fecha_creacion as "capturedDate",
-        i.observacion as observations,
-        i.enlace_video as enlace_video,
-        i.latitud as lat,
-        i.longitud as lng,
-        i.nombre_propietario,
-        i.celular_propietario,
-        i.idmunicipio,
-        i.porcentajeComision as "porcentajeComision",
-        i.precio_capatacion_m as "minPrice",
-        i.precio_captacion_i as "idealPrice"
-      FROM inmueble i
-      LEFT JOIN agente a ON i.idagente = a.idagente
-      LEFT JOIN municipio m ON i.idmunicipio = m.idmunicipio
-      LEFT JOIN provincia p ON m.idprovincia = p.idprovincia
-      LEFT JOIN departamento d ON p.iddepartamento = d.iddepartamento
-      WHERE i.idinmueble = $1 AND i.estado != 'eliminado'
-      `,
-      [id]
-    );
-
-    if (result.rows.length === 0) {
+    const property = await getProperty(id);
+    
+    if (!property) {
       return null;
     }
-
-    const property = result.rows[0];
     
     const [priceChanges, offers] = await Promise.all([
       getPriceChangesByProperty(id),
@@ -268,7 +281,7 @@ const updateProperty = async (id, updateData) => {
       return null;
     }
 
-    return getPropertyById(id);
+    return getProperty(id);
   } catch (error) {
     console.error("Error en updateProperty:", error);
     throw error;
@@ -277,7 +290,7 @@ const updateProperty = async (id, updateData) => {
 
 const updatePropertyPrice = async (propertyId, newPrice, user) => {
   try {
-    const property = await getPropertyById(propertyId);
+    const property = await getProperty(propertyId);
     if (!property) {
       throw new Error("Propiedad no encontrada");
     }
@@ -293,7 +306,7 @@ const updatePropertyPrice = async (propertyId, newPrice, user) => {
     await query(
       `
       UPDATE inmueble 
-      SET precio_capatacion_s = $1 
+      SET precio_captacion_i = $1 
       WHERE idinmueble = $2
       `,
       [newPrice, propertyId]
@@ -310,7 +323,9 @@ const updatePropertyPrice = async (propertyId, newPrice, user) => {
 
     await query("COMMIT");
 
-    return getPropertyById(propertyId);
+    property.price = newPrice;
+    
+    return property;
   } catch (error) {
     await query("ROLLBACK");
     console.error("Error en updatePropertyPrice:", error);
@@ -413,6 +428,7 @@ const updateOfferStatus = async (offerId, propertyId, status, user) => {
         `
         UPDATE inmueble 
         SET estado = $1, 
+            precio_captacion_i = $2,
             precio_capatacion_s = $2,
             precio_vendido = $2
         WHERE idinmueble = $3
