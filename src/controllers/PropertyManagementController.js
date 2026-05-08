@@ -79,11 +79,6 @@ const savePropertyProgress = async (req, res) => {
       return res.status(400).json({ error: "El título es obligatorio" });
     }
 
-    if (!propertyData.operacion) {
-      console.log("Error: Operación faltante");
-      return res.status(400).json({ error: "La operación es obligatoria" });
-    }
-
     if (!propertyData.idagente) {
       console.log("Error: ID de agente faltante");
       return res.status(400).json({ error: "El ID del agente es obligatorio" });

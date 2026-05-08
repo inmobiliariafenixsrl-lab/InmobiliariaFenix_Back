@@ -20,9 +20,9 @@ const validatePropertyType = (tipoPropiedad) => {
 
   if (!tiposPermitidos.includes(normalized)) {
     console.warn(
-      `Tipo de propiedad "${tipoPropiedad}" no reconocido, usando "casa" como valor por defecto`,
+      `Tipo de propiedad "${tipoPropiedad}" no reconocido, usando "null" como valor por defecto`,
     );
-    return "casa";
+    return null;
   }
   return normalized;
 };
@@ -36,9 +36,9 @@ const validateOperation = (operacion) => {
 
   if (!opsPermitidas.includes(normalized)) {
     console.warn(
-      `Operación "${operacion}" no reconocida, usando "venta" como valor por defecto`,
+      `Operación "${operacion}" no reconocida, usando null como valor por defecto`,
     );
-    return "venta";
+    return null;
   }
   return normalized;
 };
@@ -49,9 +49,9 @@ const validateCondition = (condicion) => {
 
   if (!condicionesPermitidas.includes(normalized)) {
     console.warn(
-      `Condición "${condicion}" no reconocida, usando "nuevo" como valor por defecto`,
+      `Condición "${condicion}" no reconocida, usando null como valor por defecto`,
     );
-    return "nuevo";
+    return null;
   }
   return normalized;
 };
