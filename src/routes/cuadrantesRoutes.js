@@ -11,6 +11,8 @@ router.post('/',
   authorize(['administrador']),   
   cuadrantesController.createCuadrante);
 
+router.get('/:idCuadrante', cuadrantesController.getCuadranteById);
+
 router.patch('/:id',
   authorize(['administrador']),   
   cuadrantesController.updateCuadrante);
