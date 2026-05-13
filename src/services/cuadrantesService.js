@@ -31,6 +31,21 @@ class CuadrantesService {
     }
   }
 
+  async getCuadranteById(idCuadrante) {
+    const consulta = `
+      SELECT 
+        idcuadrante as id,
+        nombre as name,
+        puntos as points,
+        descripcion as description,
+        precio as price
+      FROM Cuadrante
+      WHERE idcuadrante = $1
+    `;
+    const result = await query(consulta, [idCuadrante]);
+    return result.rows[0];
+  }
+
   async createCuadrante(cuadranteData) {
     try {
       await query("BEGIN");

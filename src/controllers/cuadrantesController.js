@@ -17,6 +17,24 @@ const getAllCuadrantes = async (req, res) => {
   }
 };
 
+const getCuadranteById = async (req, res) => {
+  try {
+    const { idCuadrante } = req.params;
+    const cuadrante = await cuadrantesService.getCuadranteById(idCuadrante);
+    res.status(200).json({
+      success: true,
+      data: cuadrante,
+    });
+  } catch (error) {
+    console.error("Error en getAllCuadrantes:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error al obtener las zonas",
+      error: error.message,
+    });
+  }
+}
+
 const createCuadrante = async (req, res) => {
   try {
     const cuadranteData = req.body;
@@ -118,6 +136,7 @@ const deleteCuadrante = async (req, res) => {
 
 module.exports = {
   getAllCuadrantes,
+  getCuadranteById,
   createCuadrante,
   updateCuadrante,
   deleteCuadrante,
