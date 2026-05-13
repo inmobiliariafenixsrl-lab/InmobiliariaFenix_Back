@@ -5,6 +5,7 @@ const { authenticate } = require("../middleware/loginmiddleware");
 
 router.use(authenticate);
 
+router.post("/calculate-value", acmController.calculateValue)
 router.get("/departments", acmController.getDepartments);
 router.get("/zones/:idmunicipio", acmController.getZonesByMunicipio);
 
