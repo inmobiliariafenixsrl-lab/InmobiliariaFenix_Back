@@ -343,7 +343,6 @@ const getOffersByProperty = async (propertyId) => {
         fecha_oferta as date,
         monto_oferta as amount,
         nombre_ofertante as "offeredBy",
-        celular_ofertante as phone,
         monto_seña as "depositAmount",
         estado as "status"
       FROM oferta_inmueble 
@@ -362,23 +361,22 @@ const getOffersByProperty = async (propertyId) => {
 
 const createOffer = async (offerData, user) => {
   try {
-    const { propertyId, amount, offeredBy, phone, depositAmount } = offerData;
+    const { propertyId, amount, offeredBy, depositAmount } = offerData;
     
     const result = await query(
       `
       INSERT INTO oferta_inmueble 
-      (idinmueble, nombre_ofertante, celular_ofertante, monto_oferta, monto_seña, idagente_responsable)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      (idinmueble, nombre_ofertante, monto_oferta, monto_seña, idagente_responsable)
+      VALUES ($1, $2, $3, $4, $5)
       RETURNING 
         idoferta as id,
         idinmueble as "propertyId",
         fecha_oferta as date,
         monto_oferta as amount,
         nombre_ofertante as "offeredBy",
-        celular_ofertante as phone,
         monto_seña as "depositAmount"
       `,
-      [propertyId, offeredBy, phone, amount, depositAmount, user.idagente]
+      [propertyId, offeredBy, amount, depositAmount, user.idagente]
     );
 
     await query(
