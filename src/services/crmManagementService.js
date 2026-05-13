@@ -456,13 +456,34 @@ const updateOfferStatus = async (offerId, propertyId, status, user) => {
 
       await cuadrantesService.recalcularCuadrante(propertyId);
     } else {
+      const totalOffers = await query(
+        `
+        SELECT COUNT(*) as "totalOfertas" 
+        FROM oferta_inmueble 
+        WHERE idinmueble = $1 AND (estado != 'rechazado' OR estado IS NULL)
+        `,
+        [propertyId]
+      );
+
+      if (totalOffers.rows[0].totalOfertas == 1){
+        await query(
+          `
+          UPDATE inmueble 
+          SET estado = $1 
+          WHERE idinmueble = $2
+          `,
+          [propertyStatus, propertyId]
+        );
+      }
+
       await query(
         `
-        UPDATE inmueble 
-        SET estado = $1 
-        WHERE idinmueble = $2
+        UPDATE oferta_inmueble
+        SET estado = $1
+        WHERE idoferta = $2
+            AND idinmueble = $3
         `,
-        [propertyStatus, propertyId]
+        ['rechazado', offerId, propertyId]
       );
     }
 
