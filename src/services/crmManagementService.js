@@ -609,14 +609,36 @@ const getTimelineByProperty = async (propertyId, priceChanges, offers) => {
     });
 
     offers.forEach(offer => {
+      let timelineId;
+      let timelineTittle;
+
+      if (offer.originalOfferId){
+        timelineId = `counterOffer-${offer.id}`;
+        timelineTittle = "Contra Oferta";
+      } else {
+        timelineId = `offer-${offer.id}`;
+        timelineTittle = "Nueva Oferta"
+      }
+
       timeline.push({
-        id: `offer-${offer.id}`,
+        id: timelineId,
         propertyId,
         date: offer.date,
         type: "oferta",
-        title: "Nueva oferta",
+        title: timelineTittle,
         description: `Oferta de ${offer.amount} por ${offer.offeredBy}`
       });
+
+      if (offer.status === 'rechazado'){
+        timeline.push({
+          id: `rejectedOffer-${offer.id}`,
+          propertyId,
+          date: offer.date,
+          type: "oferta",
+          title: "Oferta Rechazada",
+          description: `Oferta rechazada por:  ${offer.declineReason}`
+        });
+      }
     });
 
     timeline.sort((a, b) => new Date(b.date) - new Date(a.date));
