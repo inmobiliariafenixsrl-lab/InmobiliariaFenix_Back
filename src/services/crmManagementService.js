@@ -38,7 +38,7 @@ const canEditPropertyPrice = async (agentId, user) => {
 const isPropertyRecivingOffers = async (propertyId) => {
   const isRecivingOffer = await query(
     `
-    SELECT COUNT(*)
+    SELECT COUNT(*) as aceptado
     FROM oferta_inmueble
     WHERE estado = 'aceptado' AND idinmueble = $1
     `,
@@ -220,6 +220,7 @@ const getPropertyById = async (id) => {
       getPriceChangesByProperty(id),
       getOffersByProperty(id),
     ]);
+    // aqui agregar el filtro por agentes
 		const timeline = await getTimelineByProperty(id, priceChanges, offers);
 
     return {
@@ -351,6 +352,7 @@ const updatePropertyPrice = async (propertyId, newPrice, user) => {
 
 const getOffersByProperty = async (propertyId) => {
   try {
+    //añadir idagente_responsable
     const result = await query(
       `
       SELECT 
@@ -361,7 +363,8 @@ const getOffersByProperty = async (propertyId) => {
         nombre_ofertante as "offeredBy",
         monto_seña as "depositAmount",
         estado as "status",
-        motivo_rechazo as "declineReason"
+        motivo_rechazo as "declineReason",
+        idoferta_padre as "originalOfferId"
       FROM oferta_inmueble 
       WHERE idinmueble = $1
       ORDER BY fecha_oferta DESC
@@ -378,28 +381,29 @@ const getOffersByProperty = async (propertyId) => {
 
 const createOffer = async (offerData, user) => {
   try {
-    const { propertyId, amount, offeredBy, depositAmount } = offerData;
+    const { propertyId, amount, offeredBy, depositAmount, originalOfferId } = offerData;
 
     const isRecivingOffer = await isPropertyRecivingOffers(propertyId);
     
-    if (isRecivingOffer){
+    if (!isRecivingOffer){
       return { error: 'CONFLICT' };
     }
     
     const result = await query(
       `
       INSERT INTO oferta_inmueble 
-      (idinmueble, nombre_ofertante, monto_oferta, monto_seña, idagente_responsable, estado)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      (idinmueble, nombre_ofertante, monto_oferta, monto_seña, idagente_responsable, estado, idoferta_padre)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING 
         idoferta as id,
         idinmueble as "propertyId",
         fecha_oferta as date,
         monto_oferta as amount,
         nombre_ofertante as "offeredBy",
-        monto_seña as "depositAmount"
+        monto_seña as "depositAmount",
+        idoferta_padre as "originalOfferId"
       `,
-      [propertyId, offeredBy, amount, depositAmount, user.idagente, 'pendiente']
+      [propertyId, offeredBy, amount, depositAmount, user.idagente, 'pendiente', originalOfferId || null]
     );
 
     await query(
@@ -449,7 +453,7 @@ const updateOfferStatus = async (offerId, propertyId, status, reason, user) => {
     if (status === 'aceptado') {
       const isAceptingOffers = await isPropertyRecivingOffers(propertyId);
 
-      if (isAceptingOffers){
+      if (!isAceptingOffers){
         return { error: 'CONFLICT' };
       }
       
