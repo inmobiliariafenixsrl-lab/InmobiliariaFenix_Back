@@ -29,8 +29,9 @@ const getProperties = async (req, res) => {
 const getPropertyById = async (req, res) => {
   try {
     const { id } = req.params;
+    const user = req.user;
     
-    const property = await crmManagementService.getPropertyById(id);
+    const property = await crmManagementService.getPropertyById(id, user);
     
     if (!property) {
       return res.status(404).json({

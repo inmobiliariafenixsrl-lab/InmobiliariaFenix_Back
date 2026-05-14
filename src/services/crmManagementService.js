@@ -208,7 +208,7 @@ const getProperties = async (filters = {}) => {
   }
 };
 
-const getPropertyById = async (id) => {
+const getPropertyById = async (id, user) => {
   try {
     const property = await getProperty(id);
     
@@ -220,13 +220,19 @@ const getPropertyById = async (id) => {
       getPriceChangesByProperty(id),
       getOffersByProperty(id),
     ]);
-    // aqui agregar el filtro por agentes
 		const timeline = await getTimelineByProperty(id, priceChanges, offers);
+    
+    let filteredOffers;
+    console.log(offers)
+    if(property.agentId == user.idagente)
+      filteredOffers = offers;
+    else
+      filteredOffers = offers.filter(offer => offer.idagente_responsable === user.idagente);
 
     return {
       ...property,
       priceChanges,
-      offers,
+      offers: filteredOffers,
       timeline
     };
   } catch (error) {
@@ -352,7 +358,6 @@ const updatePropertyPrice = async (propertyId, newPrice, user) => {
 
 const getOffersByProperty = async (propertyId) => {
   try {
-    //añadir idagente_responsable
     const result = await query(
       `
       SELECT 
@@ -364,7 +369,8 @@ const getOffersByProperty = async (propertyId) => {
         monto_seña as "depositAmount",
         estado as "status",
         motivo_rechazo as "declineReason",
-        idoferta_padre as "originalOfferId"
+        idoferta_padre as "originalOfferId",
+        idagente_responsable
       FROM oferta_inmueble 
       WHERE idinmueble = $1
       ORDER BY fecha_oferta DESC
