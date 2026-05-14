@@ -367,10 +367,6 @@ const calculateValue = async (property, options = {}) => {
   
   // Construir factores
   const factors = [
-    { label: 'Departamento', value: property.department, impact: 'base', details: 'Ubicación geográfica' },
-    { label: 'Provincia', value: property.province, impact: 'base', details: 'Ubicación geográfica' },
-    { label: 'Municipio', value: property.municipality, impact: 'base', details: 'Ubicación geográfica' },
-    { label: 'Zona/Cuadrante', value: selectedZone?.name || property.zoneName || 'No seleccionado', impact: 'base', details: selectedZone ? `Precio terreno: $${zonePrice}/m², Construcción: $${zoneConstructionPrice}/m²` : 'Seleccione una zona en el mapa' },
     { label: 'm² Construcción', value: `${sqMeters} m²`, impact: `$${zoneConstructionPrice.toLocaleString()}/m²`, details: `Precio base por zona` },
     { label: 'm² Terreno', value: `${sqMetersLand} m²`, impact: `$${zonePrice.toLocaleString()}/m²`, details: `Valor terreno: ${((landValue / (landValue + constructionValue)) * 100).toFixed(0)}% del total` },
     { label: 'Tipo Construcción', value: getConstructionTypeLabel(constructionType), impact: `$${baseConstructionPrice}/m²`, details: `Categoría: ${constructionType}` },
@@ -378,7 +374,6 @@ const calculateValue = async (property, options = {}) => {
     { label: 'Valor Terreno', value: `$${Math.round(landValue).toLocaleString()}`, impact: `${((landValue / finalValue) * 100).toFixed(0)}% del total`, details: `${sqMetersLand} m² × $${zonePrice}/m²` },
     { label: 'Valor Construcción', value: `$${Math.round(constructionValue).toLocaleString()}`, impact: `${((constructionValue / finalValue) * 100).toFixed(0)}% del total`, details: `${sqMeters} m² × $${zoneConstructionPrice}/m²` },
     { label: 'Depreciación', value: `-$${Math.round(depreciationValue).toLocaleString()}`, impact: `-${depreciationPercentage * 100}%`, details: `Por condición: ${condition}` },
-    ...optionalFactors.map(f => ({ label: f.label, value: f.value, impact: f.impact, details: 'Multiplicador opcional' })),
     { label: 'Valor Final Estimado', value: `$${Math.round(finalValue).toLocaleString()}`, impact: `${pricePerSqm.toLocaleString()}/m²`, details: `Precio por metro cuadrado construido` },
   ];
   
