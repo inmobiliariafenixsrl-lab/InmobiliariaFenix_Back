@@ -148,6 +148,22 @@ const createOffer = async (req, res) => {
     }
     
     const offer = await crmManagementService.createOffer(offerData, user);
+
+    if (offer?.error) {
+      switch (offer.error) {
+        case 'CONFLICT':
+          return res.status(409).json({
+            success: false,
+            message: "Ya no se aceptan nuevas solicitudes de ofertas",
+          });
+
+        default:
+          return res.status(400).json({
+            success: false,
+            message: "Error al crear una oferta",
+          });
+      }
+    }
     
     res.status(201).json({
       success: true,
@@ -167,7 +183,7 @@ const createOffer = async (req, res) => {
 const updateOfferStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, propertyId } = req.body;
+    const { status, propertyId, reason } = req.body;
     const user = req.user;
     
     if (!status || !propertyId) {
@@ -177,7 +193,29 @@ const updateOfferStatus = async (req, res) => {
       });
     }
     
-    const offer = await crmManagementService.updateOfferStatus(id, propertyId, status, user);
+    const offer = await crmManagementService.updateOfferStatus(id, propertyId, status, reason, user);
+    
+    if (offer?.error) {
+      switch (offer.error) {
+        case 'CONFLICT':
+          return res.status(409).json({
+            success: false,
+            message: "Ya se acepto otra oferta",
+          });
+
+        case 'MISSING_REASON':
+          return res.status(400).json({
+            success: false,
+            message: "Falta el motivo del rechazo",
+          });
+
+        default:
+          return res.status(400).json({
+            success: false,
+            message: "Error al aceptar la oferta",
+          });
+      }
+    }
     
     res.json({
       success: true,
