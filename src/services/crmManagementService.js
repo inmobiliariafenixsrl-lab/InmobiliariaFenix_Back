@@ -412,6 +412,18 @@ const createOffer = async (offerData, user) => {
       [propertyId, offeredBy, amount, originalOfferId ? null : depositAmount, user.idagente, 'pendiente', originalOfferId || null]
     );
 
+    if (originalOfferId){
+      await query(
+        `
+        UPDATE oferta_inmueble
+        SET estado = 'rechazado',
+            motivo_rechazo = 'Contra oferta'
+        WHERE idoferta = $1
+        `,
+        [originalOfferId]
+      )
+    }
+
     await query(
       `
       UPDATE inmueble 
