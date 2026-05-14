@@ -35,6 +35,22 @@ const canEditPropertyPrice = async (agentId, user) => {
   return false;
 };
 
+const isPropertyRecivingOffers = async (propertyId) => {
+  const isRecivingOffer = await query(
+    `
+    SELECT COUNT(*)
+    FROM oferta_inmueble
+    WHERE estado = 'aceptado' AND idinmueble = $1
+    `,
+    [propertyId]
+  );
+
+  if (isRecivingOffer.rows[0].aceptado == 1){
+    return false;
+  }
+  return true;
+}
+
 const getProperty = async (id) => {
   try {
     const result = await query(
@@ -344,7 +360,8 @@ const getOffersByProperty = async (propertyId) => {
         monto_oferta as amount,
         nombre_ofertante as "offeredBy",
         monto_seña as "depositAmount",
-        estado as "status"
+        estado as "status",
+        motivo_rechazo as "declineReason"
       FROM oferta_inmueble 
       WHERE idinmueble = $1
       ORDER BY fecha_oferta DESC
@@ -362,12 +379,18 @@ const getOffersByProperty = async (propertyId) => {
 const createOffer = async (offerData, user) => {
   try {
     const { propertyId, amount, offeredBy, depositAmount } = offerData;
+
+    const isRecivingOffer = await isPropertyRecivingOffers(propertyId);
+    
+    if (isRecivingOffer){
+      return { error: 'CONFLICT' };
+    }
     
     const result = await query(
       `
       INSERT INTO oferta_inmueble 
-      (idinmueble, nombre_ofertante, monto_oferta, monto_seña, idagente_responsable)
-      VALUES ($1, $2, $3, $4, $5)
+      (idinmueble, nombre_ofertante, monto_oferta, monto_seña, idagente_responsable, estado)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING 
         idoferta as id,
         idinmueble as "propertyId",
@@ -376,7 +399,7 @@ const createOffer = async (offerData, user) => {
         nombre_ofertante as "offeredBy",
         monto_seña as "depositAmount"
       `,
-      [propertyId, offeredBy, amount, depositAmount, user.idagente]
+      [propertyId, offeredBy, amount, depositAmount, user.idagente, 'pendiente']
     );
 
     await query(
@@ -395,7 +418,7 @@ const createOffer = async (offerData, user) => {
   }
 };
 
-const updateOfferStatus = async (offerId, propertyId, status, user) => {
+const updateOfferStatus = async (offerId, propertyId, status, reason, user) => {
   try {
     let propertyStatus = '';
     let offerAmount = null;
@@ -417,11 +440,19 @@ const updateOfferStatus = async (offerId, propertyId, status, user) => {
       case 'rechazado':
         propertyStatus = 'activo';
         break;
+
       default:
         propertyStatus = 'activo';
+        break;
     }
 
     if (status === 'aceptado') {
+      const isAceptingOffers = await isPropertyRecivingOffers(propertyId);
+
+      if (isAceptingOffers){
+        return { error: 'CONFLICT' };
+      }
+      
       await query(
         `
         UPDATE inmueble 
@@ -447,20 +478,25 @@ const updateOfferStatus = async (offerId, propertyId, status, user) => {
       await query(
         `
         UPDATE oferta_inmueble
-        SET estado = $1
+        SET estado = $1,
+            motivo_rechazo = 'Otra oferta fue aceptada'
         WHERE idoferta != $2
             AND idinmueble = $3
+            AND estado != 'rechazado'
         `,
         ['rechazado', offerId, propertyId]
       );
 
       await cuadrantesService.recalcularCuadrante(propertyId);
     } else {
+      if(!reason)
+          return { error: 'MISSING_REASON'}
+
       const totalOffers = await query(
         `
         SELECT COUNT(*) as "totalOfertas" 
         FROM oferta_inmueble 
-        WHERE idinmueble = $1 AND (estado != 'rechazado' OR estado IS NULL)
+        WHERE idinmueble = $1 AND estado != 'rechazado'
         `,
         [propertyId]
       );
@@ -479,11 +515,12 @@ const updateOfferStatus = async (offerId, propertyId, status, user) => {
       await query(
         `
         UPDATE oferta_inmueble
-        SET estado = $1
-        WHERE idoferta = $2
-            AND idinmueble = $3
+        SET estado = $1,
+            motivo_rechazo = $2
+        WHERE idoferta = $3
+            AND idinmueble = $4
         `,
-        ['rechazado', offerId, propertyId]
+        ['rechazado', reason, offerId, propertyId]
       );
     }
 
