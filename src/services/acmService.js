@@ -111,7 +111,7 @@ const getZonesByMunicipio = async (idmunicipio) => {
     CROSS JOIN cuadrante_geom c
 
     ORDER BY distancia_metros ASC
-    LIMIT 20;
+    LIMIT 50;
   `;
 
   const result = await query(sql, [idmunicipio]);
