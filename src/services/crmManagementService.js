@@ -409,7 +409,7 @@ const createOffer = async (offerData, user) => {
         monto_seña as "depositAmount",
         idoferta_padre as "originalOfferId"
       `,
-      [propertyId, offeredBy, amount, depositAmount, user.idagente, 'pendiente', originalOfferId || null]
+      [propertyId, offeredBy, amount, originalOfferId ? null : depositAmount, user.idagente, 'pendiente', originalOfferId || null]
     );
 
     await query(
