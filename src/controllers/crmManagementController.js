@@ -260,6 +260,78 @@ const getAgentById = async (req, res) => {
   }
 };
 
+const getNegotiationHistory = async (req, res) => {
+  try {
+    const { offerId, propertyId } = req.params;
+    const user = req.user;
+
+    // Validaciones de parámetros
+    if (!offerId || !propertyId) {
+      return res.status(400).json({
+        success: false,
+        message: "Se requiere offerId y propertyId"
+      });
+    }
+
+    // Validar que sean números válidos
+    if (isNaN(offerId) || isNaN(propertyId)) {
+      return res.status(400).json({
+        success: false,
+        message: "offerId y propertyId deben ser números válidos"
+      });
+    }
+
+    const negotiationThread = await crmManagementService.getNegotiationHistory(
+      parseInt(offerId),
+      parseInt(propertyId),
+      user
+    );
+
+    if (!negotiationThread) {
+      return res.status(404).json({
+        success: false,
+        message: "No se encontró el historial de negociaciones"
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: negotiationThread
+    });
+
+  } catch (error) {
+    console.error("Error en getNegotiationHistory:", error);
+    
+    // Manejo específico de errores
+    if (error.message === 'PROPERTY_NOT_FOUND') {
+      return res.status(404).json({
+        success: false,
+        message: "Propiedad no encontrada"
+      });
+    }
+    
+    if (error.message === 'OFFER_NOT_FOUND') {
+      return res.status(404).json({
+        success: false,
+        message: "Oferta no encontrada en esta propiedad"
+      });
+    }
+
+    if (error.message === 'ACCESS_DENIED') {
+      return res.status(403).json({
+        success: false,
+        message: "No tienes permiso para ver este historial"
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "Error interno del servidor",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined
+    });
+  }
+};
+
 module.exports = {
   getProperties,
   getPropertyById,
@@ -268,4 +340,5 @@ module.exports = {
   createOffer,
   updateOfferStatus,
   getAgentById,
+  getNegotiationHistory
 };

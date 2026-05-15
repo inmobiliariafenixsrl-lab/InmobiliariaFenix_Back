@@ -12,6 +12,11 @@ router.patch("/properties/:id/price", authenticate, crmManagementController.upda
 // Ofertas
 router.post("/offers", authenticate, crmManagementController.createOffer);
 router.patch("/offers/:id/status", authenticate, crmManagementController.updateOfferStatus);
+router.get(
+  "/offers-history/:offerId/:propertyId", 
+  authenticate, 
+  crmManagementController.getNegotiationHistory
+);
 
 // Agentes
 router.get("/agents/:id", authenticate, crmManagementController.getAgentById);

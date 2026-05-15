@@ -759,6 +759,176 @@ const getAgentById = async (id) => {
   }
 };
 
+const buildNegotiationTree = async (offers, parentId = null) => {
+  const children = offers.filter(offer => offer.parentId === parentId);
+  
+  for (const child of children) {
+    child.childNegotiations = await buildNegotiationTree(offers, child.id);
+  }
+  
+  return children;
+};
+
+const determineRepresentedParty = (offer, propertyOwnerName, agentId) => {
+  if (offer.offeredBy === propertyOwnerName) {
+    return 'owner';
+  }
+  return 'bidder';
+};
+
+const hasAccessToNegotiationHistory = async (offers, userId, userRole) => {
+  if (userRole === 'administrador') {
+    return true;
+  }
+  
+  const isInvolved = offers.some(offer => offer.agentResponsible === userId);
+  
+  if (isInvolved) {
+    return true;
+  }
+  
+  if (userRole === 'team_leader') {
+    const allInvolvedAgents = [
+      ...(offers.rows[0]?.agents_responsible || [])
+    ];
+    
+    if (allInvolvedAgents.length === 0) {
+      return false;
+    }
+    
+    const groupCheckResult = await query(
+      `
+      SELECT EXISTS(
+        SELECT 1 
+        FROM agente a1
+        JOIN agente a2 ON a1.idgrupo = a2.idgrupo
+        WHERE a1.idagente = $1 
+          AND a2.idagente = ANY($2::int[])
+          AND a1.idgrupo IS NOT NULL
+      ) AS same_group
+      `,
+      [userId, allInvolvedAgents]
+    );
+    
+    return groupCheckResult.rows[0].same_group;
+  }
+  
+  return false;
+};
+
+const getNegotiationHistory = async (offerId, propertyId, user) => {
+  try {
+    const propertyResult = await query(
+      `SELECT nombre_propietario, titulo FROM inmueble WHERE idinmueble = $1`,
+      [propertyId]
+    );
+
+    if (propertyResult.rows.length === 0) {
+      throw new Error('PROPERTY_NOT_FOUND');
+    }
+
+    const propertyOwnerName = propertyResult.rows[0].nombre_propietario;
+    const propertyTitle = propertyResult.rows[0].titulo;
+    
+    const offersResult = await query(
+      `
+        SELECT 
+          o.idoferta as id,
+          o.idinmueble as "propertyId",
+          o.idoferta_padre as "parentId",
+          o.nombre_ofertante as "offeredBy",
+          o.monto_oferta as amount,
+          o.monto_seña as "depositAmount",
+          o.fecha_oferta as date,
+          o.estado as status,
+          o.motivo_rechazo as "declineReason",
+          o.fecha_rechazo as "rejectedDate",
+		      o.fecha_aceptacion as "aceptedDate",
+          o.idagente_responsable as "agentResponsible",
+          o.idagente_aceptado as "agentAccepted",
+          CASE 
+            WHEN o.idoferta_padre IS NOT NULL THEN TRUE
+            ELSE FALSE
+          END as "isCounterOffer"
+        FROM oferta_inmueble o
+        WHERE o.idinmueble = $1
+          AND (o.idoferta = $2 OR o.idoferta_padre = $2)
+		    ORDER BY o.fecha_oferta ASC
+      `,
+      [propertyId, offerId]
+    );
+    
+    if (offersResult.rows.length === 0) {
+      throw new Error('OFFER_NOT_FOUND');
+    }
+
+    const hasAccess = await hasAccessToNegotiationHistory(
+      offersResult.rows,
+      user.idagente, 
+      user.rol
+    );
+    
+    if (!hasAccess) {
+      throw new Error('ACCESS_DENIED');
+    }
+    
+    const rootOffer = offersResult.rows.find(offer => !offer.parentId);
+    
+    if (!rootOffer) {
+      throw new Error('OFFER_NOT_FOUND');
+    }
+    
+    const agentIds = [...new Set(offersResult.rows.flatMap(offer => 
+      [offer.agentResponsible, offer.agentAccepted].filter(id => id)
+    ))];
+    
+    let agentMap = new Map();
+    if (agentIds.length > 0) {
+      const agentsResult = await query(
+        `
+        SELECT 
+          idagente as id,
+          nombre || ' ' || apellido as name
+        FROM agente
+        WHERE idagente = ANY($1::int[])
+        `,
+        [agentIds]
+      );
+      
+      agentsResult.rows.forEach(agent => {
+        agentMap.set(agent.id, agent.name);
+      });
+    }
+    
+    const enrichedOffers = offersResult.rows.map(offer => ({
+      ...offer,
+      agentResponsible: agentMap.get(offer.agentResponsible) || offer.agentResponsible,
+      agentAccepted: agentMap.get(offer.agentAccepted) || offer.agentAccepted,
+      representedParty: determineRepresentedParty(offer, propertyOwnerName, offer.agentResponsible)
+    }));
+    
+    const negotiations = await buildNegotiationTree(enrichedOffers);
+    
+    const rootWithChildren = negotiations.find(n => n.id === rootOffer.id);
+    
+    const mainOfferedBy = rootOffer.offeredBy;
+    
+    const negotiationThread = {
+      originalOfferId: rootOffer.id.toString(),
+      propertyId: propertyId.toString(),
+      propertyTitle: propertyTitle,
+      mainOfferedBy: mainOfferedBy,
+      negotiations: rootWithChildren ? [rootWithChildren] : []
+    };
+    
+    return negotiationThread;
+    
+  } catch (error) {
+    console.error("Error en getNegotiationHistory:", error);
+    throw error;
+  }
+};
+
 module.exports = {
   getProperties,
   getPropertyById,
@@ -767,4 +937,5 @@ module.exports = {
   createOffer,
   updateOfferStatus,
   getAgentById,
+  getNegotiationHistory,
 };
