@@ -92,7 +92,12 @@ const getProperty = async (id) => {
         i.idmunicipio,
         i.porcentajeComision as "porcentajeComision",
         i.precio_capatacion_m as "minPrice",
-        i.precio_captacion_i as "idealPrice"
+        i.precio_captacion_i as "idealPrice",
+        i.nombre_contacto_secundario as "nombre_contacto_secundario",
+        i.celular_contacto_secundario as "celular_contacto_secundario",
+        i.porcentaje_venta as "porcentajeVenta",
+        i.porcentaje_captacion as "porcentajeCaptacion",
+        i.es_exclusivo as "esExclusivo"
       FROM inmueble i
       LEFT JOIN agente a ON i.idagente = a.idagente
       LEFT JOIN municipio m ON i.idmunicipio = m.idmunicipio
@@ -155,7 +160,12 @@ const getProperties = async (filters = {}) => {
         i.porcentajeComision as "porcentajeComision",
         i.precio_capatacion_m as "minPrice",
         i.precio_captacion_i as "idealPrice",
-        i.fecha_creacion as "createdDate"
+        i.fecha_creacion as "createdDate",
+        i.nombre_contacto_secundario as "nombre_contacto_secundario",
+        i.celular_contacto_secundario as "celular_contacto_secundario",
+        i.porcentaje_venta as "porcentajeVenta",
+        i.porcentaje_captacion as "porcentajeCaptacion",
+        i.es_exclusivo as "esExclusivo"
       FROM inmueble i
       LEFT JOIN agente a ON i.idagente = a.idagente
       LEFT JOIN municipio m ON i.idmunicipio = m.idmunicipio
