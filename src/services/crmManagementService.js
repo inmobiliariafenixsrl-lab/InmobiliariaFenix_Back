@@ -418,9 +418,9 @@ const createOffer = async (offerData, user) => {
         UPDATE oferta_inmueble
         SET estado = 'rechazado',
             motivo_rechazo = 'Contra oferta'
-        WHERE idoferta = $1
+        WHERE (idoferta = $1 OR idoferta_padre = $1) AND estado != 'rechazado' AND idoferta != $2
         `,
-        [originalOfferId]
+        [originalOfferId, result.rows[0].id]
       )
     }
 
