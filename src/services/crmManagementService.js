@@ -223,7 +223,6 @@ const getPropertyById = async (id, user) => {
 		const timeline = await getTimelineByProperty(id, priceChanges, offers);
     
     let filteredOffers;
-    console.log(offers)
     if(property.agentId == user.idagente)
       filteredOffers = offers;
     else
@@ -364,6 +363,8 @@ const getOffersByProperty = async (propertyId) => {
         idoferta as id,
         idinmueble as "propertyId",
         fecha_oferta as date,
+        fecha_rechazo as "rejectedDate",
+        fecha_aceptacion as "aceptedDate",
         monto_oferta as amount,
         nombre_ofertante as "offeredBy",
         monto_seña as "depositAmount",
@@ -417,7 +418,8 @@ const createOffer = async (offerData, user) => {
         `
         UPDATE oferta_inmueble
         SET estado = 'rechazado',
-            motivo_rechazo = 'Contra oferta'
+            motivo_rechazo = 'Contra oferta',
+            fecha_rechazo = timezone('America/La_Paz', NOW())
         WHERE (idoferta = $1 OR idoferta_padre = $1) AND estado != 'rechazado' AND idoferta != $2
         `,
         [originalOfferId, result.rows[0].id]
@@ -491,7 +493,8 @@ const updateOfferStatus = async (offerId, propertyId, status, reason, user) => {
         `
         UPDATE oferta_inmueble
         SET estado = $1,
-            idagente_aceptado = $2
+            idagente_aceptado = $2,
+            fecha_aceptacion = timezone('America/La_Paz', NOW())
         WHERE idoferta = $3
         `,
         ['aceptado', user.idagente, offerId]
@@ -645,7 +648,7 @@ const getTimelineByProperty = async (propertyId, priceChanges, offers) => {
         timeline.push({
           id: `rejectedOffer-${offer.id}`,
           propertyId,
-          date: offer.date,
+          date: offer.rejectedDate,
           type: "oferta",
           title: "Oferta Rechazada",
           description: `Oferta rechazada por:  ${offer.declineReason}`
@@ -666,6 +669,7 @@ const getTimelineByProperty = async (propertyId, priceChanges, offers) => {
       timeline.push({
         id: `sell-${propertyId}`,
         propertyId,
+        date: offerAceptado.aceptedDate,
         type: "cambio_estado",
         title: "Propiedad vendida",
         description: `Vendida por ${formatPriceUSD(offerAceptado.amount)} a ${offerAceptado.offeredBy}`,
