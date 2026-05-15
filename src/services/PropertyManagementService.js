@@ -415,7 +415,12 @@ const savePropertyProgress = async (propertyData, documents = null) => {
     idmunicipio,
     nombre_propietario,
     celular_propietario,
+    celular_contacto_secundario,
+    nombre_contacto_secundario,
     porcentajeComision,
+    porcentaje_captacion,
+    porcentaje_venta,
+    es_exclusivo,
     precio_m2_construccion,
     porcentaje_depreciacion,
   } = propertyData;
@@ -447,8 +452,10 @@ const savePropertyProgress = async (propertyData, documents = null) => {
         latitud, longitud, idagente, estado, observacion,
         enlace_video, idmunicipio, nombre_propietario, celular_propietario,
         porcentajeComision, precio_metro_construccion,
-        porcentajeDepreciacion, fecha_creacion
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, TIMEZONE('America/La_Paz', NOW()))
+        porcentajeDepreciacion, celular_contacto_secundario,
+        nombre_contacto_secundario, porcentaje_captacion, porcentaje_venta,
+        es_exclusivo, fecha_creacion
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, TIMEZONE('America/La_Paz', NOW()))
       RETURNING *`,
       [
         titulo || "",
@@ -484,6 +491,11 @@ const savePropertyProgress = async (propertyData, documents = null) => {
         porcentajeComision || null,
         precio_m2_construccion,
         porcentaje_depreciacion,
+        celular_contacto_secundario,
+        nombre_contacto_secundario,
+        porcentaje_captacion,
+        porcentaje_venta,
+        es_exclusivo,
       ],
     );
 
@@ -534,7 +546,12 @@ const updateProperty = async (id, propertyData, documents = null) => {
     celular_propietario,
     porcentajeComision,
     precio_m2_construccion,
-    porcentaje_depreciacion
+    porcentaje_depreciacion,
+    celular_contacto_secundario,
+    nombre_contacto_secundario,
+    porcentaje_captacion,
+    porcentaje_venta,
+    es_exclusivo,
   } = propertyData;
 
   const validatedTipoPropiedad = validatePropertyType(tipo_propiedad);
@@ -590,8 +607,13 @@ const updateProperty = async (id, propertyData, documents = null) => {
         celular_propietario = $29,
         porcentajeComision = $30,
         precio_metro_construccion = $31,
-        porcentajeDepreciacion = $32
-      WHERE idinmueble = $33
+        porcentajeDepreciacion = $32,
+        celular_contacto_secundario = $33,
+        nombre_contacto_secundario = $34,
+        porcentaje_captacion = $35,
+        porcentaje_venta = $36,
+        es_exclusivo = $37
+      WHERE idinmueble = $38
       RETURNING *`,
       [
         titulo || "",
@@ -626,6 +648,11 @@ const updateProperty = async (id, propertyData, documents = null) => {
         porcentajeComision,
         precio_m2_construccion,
         porcentaje_depreciacion,
+        celular_contacto_secundario,
+        nombre_contacto_secundario,
+        porcentaje_captacion,
+        porcentaje_venta,
+        es_exclusivo,
         id,
       ],
     );
