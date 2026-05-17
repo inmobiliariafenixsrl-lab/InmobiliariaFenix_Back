@@ -7,27 +7,6 @@ const canEditPropertyPrice = async (agentId, user) => {
     return true;
   }
   
-  if (user.rol === 'team_leader') {
-    try {
-      const result = await query(
-        `SELECT EXISTS(
-          SELECT 1 
-          FROM agente a1
-          JOIN agente a2 ON a1.idgrupo = a2.idgrupo
-          WHERE a1.idagente = $1 
-            AND a2.idagente = $2
-            AND a1.idgrupo IS NOT NULL
-        ) AS same_group`,
-        [user.idagente, agentId]
-      );
-
-      return result.rows[0].same_group;
-    } catch (error) {
-      console.error("Error verificando permisos de team_leader:", error);
-      return false;
-    }
-  }
-  
   if (user.rol === 'agente') {
     return user.idagente === agentId;
   }
