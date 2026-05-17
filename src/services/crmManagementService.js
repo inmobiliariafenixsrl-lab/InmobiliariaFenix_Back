@@ -661,7 +661,7 @@ const getTimelineByProperty = async (propertyId, priceChanges, offers) => {
           date: offer.rejectedDate,
           type: "oferta",
           title: "Oferta Rechazada",
-          description: `Oferta rechazada por:  ${offer.declineReason}`
+          description: `Oferta de ${offer.offeredBy} rechazada por:  ${offer.declineReason}`
         });
       }
     });
