@@ -899,6 +899,7 @@ const getNegotiationHistory = async (offerId, propertyId, user) => {
     const enrichedOffers = offersResult.rows.map(offer => ({
       ...offer,
       agentResponsible: agentMap.get(offer.agentResponsible) || offer.agentResponsible,
+      idagenteResponsable: offer.agentResponsible,
       agentAccepted: agentMap.get(offer.agentAccepted) || offer.agentAccepted,
       representedParty: determineRepresentedParty(offer, propertyOwnerName, offer.agentResponsible)
     }));
