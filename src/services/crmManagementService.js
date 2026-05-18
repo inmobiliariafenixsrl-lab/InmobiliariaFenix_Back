@@ -215,7 +215,10 @@ const getPropertyById = async (id, user) => {
     if(property.agentId == user.idagente)
       filteredOffers = offers;
     else
-      filteredOffers = offers.filter(offer => offer.idagente_responsable === user.idagente);
+      filteredOffers = offers.filter(offer => 
+        offer.idagente_responsable === user.idagente ||
+        offers.some(otherOffer => otherOffer.id === offer.originalOfferId)
+      );
 
     return {
       ...property,
