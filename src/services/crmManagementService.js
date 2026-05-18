@@ -884,7 +884,8 @@ const getNegotiationHistory = async (offerId, propertyId, user) => {
         `
         SELECT 
           idagente as id,
-          nombre || ' ' || apellido as name
+          nombre || ' ' || apellido as name,
+          telefono
         FROM agente
         WHERE idagente = ANY($1::int[])
         `,
@@ -893,6 +894,7 @@ const getNegotiationHistory = async (offerId, propertyId, user) => {
       
       agentsResult.rows.forEach(agent => {
         agentMap.set(agent.id, agent.name);
+        agentMap.set(agent.name, agent.telefono);
       });
     }
     
@@ -900,6 +902,7 @@ const getNegotiationHistory = async (offerId, propertyId, user) => {
       ...offer,
       agentResponsible: agentMap.get(offer.agentResponsible) || offer.agentResponsible,
       idagenteResponsable: offer.agentResponsible,
+      agentResponsibleNumber: agentMap.get(agentMap.get(offer.agentResponsible)),
       agentAccepted: agentMap.get(offer.agentAccepted) || offer.agentAccepted,
       representedParty: determineRepresentedParty(offer, propertyOwnerName, offer.agentResponsible)
     }));
